@@ -1,0 +1,84 @@
+name: Build e publicar release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v7
+
+      - name: Configurar .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Instalar Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Definir versão
+        id: version
+        shell: pwsh
+        run: |
+          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { 'v1.1.0-ci' }
+          $version = $tag.TrimStart('v')
+          if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') {
+            if ($env:GITHUB_REF_TYPE -eq 'tag') { throw "Tag inválida: $tag. Use v1.2.3" }
+            $version = '1.1.0'
+          }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Publicar aplicativo e instalador
+        shell: pwsh
+        run: |
+          .\scripts\Publish.ps1 -Installer -Version '${{ steps.version.outputs.version }}'
+
+      - name: Criar pacote portátil e checksums
+        id: assets
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $installer = Get-ChildItem .\artifacts\installer\NITHConverter-Setup-x64-*.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $installer) { throw 'Instalador não encontrado.' }
+          $portable = ".\artifacts\installer\NITHConverter-portable-win-x64-$version.zip"
+          Compress-Archive -Path .\artifacts\publish\win-x64\* -DestinationPath $portable -Force
+          foreach ($file in @($installer.FullName, (Resolve-Path $portable).Path)) {
+            $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $([IO.Path]::GetFileName($file))" | Set-Content -LiteralPath "$file.sha256" -Encoding ascii
+          }
+          "installer=$($installer.FullName)" >> $env:GITHUB_OUTPUT
+          "portable=$((Resolve-Path $portable).Path)" >> $env:GITHUB_OUTPUT
+
+      - name: Publicar GitHub Release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $installer = '${{ steps.assets.outputs.installer }}'
+          $portable = '${{ steps.assets.outputs.portable }}'
+          gh release create '${{ steps.version.outputs.tag }}' `
+            "$installer" "$installer.sha256" "$portable" "$portable.sha256" `
+            --title "NITH Converter ${{ steps.version.outputs.tag }}" `
+            --generate-notes
+
+      - name: Guardar artefatos do build manual
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: NITHConverter-${{ steps.version.outputs.version }}
+          path: |
+            artifacts/installer/*.exe
+            artifacts/installer/*.sha256
+            artifacts/installer/*.zip
