@@ -81,8 +81,21 @@ jobs:
           $portable = ".\artifacts\installer\NITHConverter-portable-win-x64-$version.zip"
           Compress-Archive -Path .\artifacts\publish\win-x64\* -DestinationPath $portable -Force
 
+          function Get-Sha256Hex([string]$Path) {
+            $sha = [Security.Cryptography.SHA256]::Create()
+            $stream = [IO.File]::OpenRead($Path)
+            try {
+              $bytes = $sha.ComputeHash($stream)
+              return ([BitConverter]::ToString($bytes)).Replace('-', '').ToLowerInvariant()
+            }
+            finally {
+              $stream.Dispose()
+              $sha.Dispose()
+            }
+          }
+
           foreach ($file in @($installer.FullName, (Resolve-Path $portable).Path)) {
-            $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            $hash = Get-Sha256Hex $file
             "$hash  $([IO.Path]::GetFileName($file))" |
               Set-Content -LiteralPath "$file.sha256" -Encoding ascii
           }
