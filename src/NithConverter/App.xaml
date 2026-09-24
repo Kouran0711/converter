@@ -1,15 +1,49 @@
 <Application x:Class="NithConverter.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Application.Resources>
     <ResourceDictionary>
-      <ResourceDictionary.MergedDictionaries><XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" /></ResourceDictionary.MergedDictionaries>
-      <SolidColorBrush x:Key="AppBackground" Color="#101318" />
-      <SolidColorBrush x:Key="CardBackground" Color="#191E26" />
-      <SolidColorBrush x:Key="CardBorder" Color="#303844" />
-      <SolidColorBrush x:Key="MutedForeground" Color="#A8B3C3" />
-      <Color x:Key="SystemAccentColor">#66BCFF</Color>
-      <Style x:Key="SectionLabel" TargetType="TextBlock"><Setter Property="FontSize" Value="12"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="CharacterSpacing" Value="120"/><Setter Property="Foreground" Value="{StaticResource MutedForeground}"/></Style>
-      <Style x:Key="PageTitle" TargetType="TextBlock"><Setter Property="FontSize" Value="30"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
-      <Style x:Key="Card" TargetType="Border"><Setter Property="Background" Value="{StaticResource CardBackground}"/><Setter Property="BorderBrush" Value="{StaticResource CardBorder}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="12"/><Setter Property="Padding" Value="24"/></Style>
+      <ResourceDictionary.MergedDictionaries>
+        <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+      </ResourceDictionary.MergedDictionaries>
+
+      <LinearGradientBrush x:Key="AppBackground" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#08111F" Offset="0"/>
+        <GradientStop Color="#0C1D33" Offset="0.48"/>
+        <GradientStop Color="#07121F" Offset="1"/>
+      </LinearGradientBrush>
+      <LinearGradientBrush x:Key="SurfaceGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#0C1830" Offset="0"/>
+        <GradientStop Color="#0A1426" Offset="1"/>
+      </LinearGradientBrush>
+      <LinearGradientBrush x:Key="PrimaryGradientBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#0A7BFF" Offset="0"/>
+        <GradientStop Color="#22D3EE" Offset="1"/>
+      </LinearGradientBrush>
+      <SolidColorBrush x:Key="CardBackground" Color="#0B1627" />
+      <SolidColorBrush x:Key="CardBackgroundAlt" Color="#0A1321" />
+      <SolidColorBrush x:Key="CardBorder" Color="#1A4E84" />
+      <SolidColorBrush x:Key="AccentBrushStrong" Color="#4FD2FF" />
+      <SolidColorBrush x:Key="AccentBrushSoft" Color="#1183FF" />
+      <SolidColorBrush x:Key="MutedForeground" Color="#A9C0D8" />
+      <SolidColorBrush x:Key="SoftForeground" Color="#7E96AF" />
+      <Color x:Key="SystemAccentColor">#22D3EE</Color>
+
+      <Style x:Key="SectionLabel" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="CharacterSpacing" Value="120"/>
+        <Setter Property="Foreground" Value="{StaticResource MutedForeground}"/>
+      </Style>
+      <Style x:Key="PageTitle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="28"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+      </Style>
+      <Style x:Key="Card" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource CardBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="18"/>
+        <Setter Property="Padding" Value="22"/>
+      </Style>
     </ResourceDictionary>
   </Application.Resources>
 </Application>

@@ -18,7 +18,7 @@ Conversor de arquivos para Windows feito para transformar imagens, documentos, v
 - Saída de vídeo em MP4, WEBM ou GIF.
 - Ajustes de qualidade de imagem, compressão PNG, largura máxima, qualidade de vídeo, FPS, bitrate de áudio, áudio ligado/desligado e cores de GIF.
 - Histórico local de conversões e pasta padrão de saída.
-- Tela de abertura animada e interface WinUI 3.
+- Tela de abertura animada, nova identidade visual e interface modernizada inspirada na Nith Digital.
 - Verificação de atualização pelo GitHub Releases.
 - Download automático do instalador de atualização, com verificação SHA-256 antes de permitir a instalação.
 

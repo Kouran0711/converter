@@ -83,7 +83,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public AsyncCommand CheckUpdatesCommand { get; }
     public AsyncCommand UpdateActionCommand { get; }
     public string AppVersionText => $"Versão {AppInfo.VersionText}";
-    public string ProductVersionText => $"NITH Converter {AppInfo.VersionText} · C# / WinUI 3 · processamento local";
+    public string ProductVersionText => $"NITH Converter {AppInfo.VersionText} · Nith Digital · processamento local";
     public string SignatureText => AppInfo.Signature;
     public string UpdateStatus { get => _updateStatus; private set => Set(ref _updateStatus, value); }
     public string UpdateDetail { get => _updateDetail; private set => Set(ref _updateDetail, value); }

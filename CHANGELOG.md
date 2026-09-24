@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.1
+- Interface reformulada com layout mais aproveitado em telas grandes e menos espaço vazio nas laterais.
+- Visual atualizado com gradientes em azul inspirados na identidade da Nith Digital.
+- Logo principal substituída por uma nova identidade visual em fundo transparente.
+- Informações técnicas de C# / WinUI removidas da interface pública.
+- A versão exibida continua dinâmica e acompanha automaticamente a versão compilada/release.
+
+
 ## 1.2.0
 - Conversão de áudio adicionada: MP3, WAV, FLAC, AAC, M4A, OGG, OPUS e WMA.
 - Entrada de arquivos de áudio pelo seletor e arrastar/soltar.

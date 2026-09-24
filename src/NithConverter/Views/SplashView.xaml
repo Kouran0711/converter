@@ -1,30 +1,21 @@
 <UserControl x:Class="NithConverter.Views.SplashView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" RequestedTheme="Dark">
-  <Grid>
-    <Grid.Background>
-      <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#0B0F14" Offset="0"/>
-        <GradientStop Color="#111A23" Offset="0.55"/>
-        <GradientStop Color="#0C1117" Offset="1"/>
-      </LinearGradientBrush>
-    </Grid.Background>
+  <Grid Background="{StaticResource AppBackground}">
     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20">
-      <Grid Width="210" Height="210" HorizontalAlignment="Center">
-        <Ellipse x:Name="Orbit" Width="190" Height="190" HorizontalAlignment="Center" VerticalAlignment="Center" Stroke="#3D66BCFF" StrokeThickness="2" StrokeDashArray="2,6"/>
-        <Ellipse Width="172" Height="172" HorizontalAlignment="Center" VerticalAlignment="Center" Stroke="#1766BCFF" StrokeThickness="1"/>
-        <Border x:Name="GlowHolder" Width="164" Height="164" HorizontalAlignment="Center" VerticalAlignment="Center" Background="#121B2533" CornerRadius="82" BorderBrush="#2F66BCFF" BorderThickness="1">
-          <Border x:Name="LogoHolder" Width="150" Height="150" HorizontalAlignment="Center" VerticalAlignment="Center">
-            <Image Source="ms-appx:///Assets/Generated/logo-256.png" AutomationProperties.Name="Logo NITH"/>
-          </Border>
+      <Grid Width="230" Height="230" HorizontalAlignment="Center">
+        <Ellipse Width="202" Height="202" HorizontalAlignment="Center" VerticalAlignment="Center" Stroke="#2D66BCFF" StrokeThickness="2" StrokeDashArray="2,7"/>
+        <Ellipse Width="180" Height="180" HorizontalAlignment="Center" VerticalAlignment="Center" Stroke="#1A53B6FF" StrokeThickness="1"/>
+        <Border Width="172" Height="172" HorizontalAlignment="Center" VerticalAlignment="Center" Background="#10223C55" CornerRadius="86" BorderBrush="#3266BCFF" BorderThickness="1">
+          <Image Source="ms-appx:///Assets/Generated/logo-256.png" Width="156" Height="156" Stretch="Uniform" AutomationProperties.Name="Logo NITH"/>
         </Border>
       </Grid>
-      <StackPanel Spacing="7">
+      <StackPanel Spacing="6">
         <TextBlock Text="NITH" FontSize="36" FontWeight="SemiBold" CharacterSpacing="220" HorizontalAlignment="Center"/>
         <TextBlock Text="CONVERTER" FontSize="12" CharacterSpacing="260" Foreground="#8ACFFF" HorizontalAlignment="Center"/>
       </StackPanel>
-      <ProgressRing IsActive="True" Width="22" Height="22" Foreground="#66BCFF"/>
+      <ProgressRing IsActive="True" Width="24" Height="24" Foreground="#4FD2FF"/>
       <StackPanel Spacing="3">
         <TextBlock Text="Preparando seu espaço…" FontSize="12" Foreground="{StaticResource MutedForeground}" HorizontalAlignment="Center"/>
-        <TextBlock Text="Nith Digital" FontSize="10" Foreground="#627487" HorizontalAlignment="Center" CharacterSpacing="80"/>
+        <TextBlock Text="Nith Digital - nithdigital.com.br" FontSize="10" Foreground="#7A97B5" HorizontalAlignment="Center" CharacterSpacing="40"/>
       </StackPanel>
     </StackPanel>
   </Grid>
