@@ -1,4 +1,0 @@
-Versão 1.3.0
-
-- Corrige a compilação da tela de abertura após a atualização visual.
-- Mantém nova identidade Nith e suporte completo a áudio.
