@@ -66,7 +66,15 @@ public sealed class DependencyService(string? applicationDirectory = null, bool 
                 .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Select(path => path.Trim('"')));
         }
-        string? magick = null, ffmpeg = null, ffprobe = null, ghostscript = null;
+        // Pacotes baixados pelo instalador podem trazer uma pasta raiz própria (principalmente FFmpeg).
+        // Procura recursivamente SOMENTE dentro de bin do aplicativo antes da busca do sistema.
+        string localBin = Path.Combine(_applicationDirectory, "bin");
+        string? magick = FindRecursive(localBin, "magick.exe", 6, token);
+        string? ffmpeg = FindRecursive(localBin, "ffmpeg.exe", 6, token);
+        string? ffprobe = FindRecursive(localBin, "ffprobe.exe", 6, token);
+        string? ghostscript = FindRecursive(localBin, "gswin64c.exe", 6, token)
+            ?? FindRecursive(localBin, "gswin32c.exe", 6, token);
+
         foreach (string root in roots.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             token.ThrowIfCancellationRequested();
@@ -78,6 +86,30 @@ public sealed class DependencyService(string? applicationDirectory = null, bool 
         if (ffmpeg is not null)
             ffprobe = Find(Path.GetDirectoryName(ffmpeg)!, "ffprobe.exe") ?? ffprobe;
         return new(magick, ffmpeg, ffprobe, ghostscript);
+    }
+
+    private static string? FindRecursive(string directory, string executable, int maxDepth, CancellationToken token)
+    {
+        if (maxDepth < 0) return null;
+        try
+        {
+            token.ThrowIfCancellationRequested();
+            string direct = Path.Combine(directory, executable);
+            if (File.Exists(direct)) return Path.GetFullPath(direct);
+            if (maxDepth == 0 || !Directory.Exists(directory)) return null;
+
+            foreach (string child in Directory.EnumerateDirectories(directory).Take(256))
+            {
+                token.ThrowIfCancellationRequested();
+                string? found = FindRecursive(child, executable, maxDepth - 1, token);
+                if (found is not null) return found;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or ArgumentException or NotSupportedException)
+        {
+            return null;
+        }
+        return null;
     }
 
     private static bool IsDependencyDirectory(string path)

@@ -1,12 +1,18 @@
-# Dependências geradas
+# Dependências — modo offline legado
 
-Não faça commit dos binários desta pasta.
+O instalador oficial do NITH Converter é **online**. O workflow normal de GitHub Actions **não baixa nem incorpora** ImageMagick, FFmpeg ou Ghostscript. Essas dependências são verificadas e baixadas pelo próprio instalador no computador do usuário.
 
-Durante um build de instalador, `scripts/Prepare-Dependencies.ps1` cria automaticamente:
+Esta pasta existe apenas para o modo de build offline opcional:
 
-- `payload/` — ImageMagick, FFmpeg/ffprobe, Ghostscript e licenças/avisos;
-- `prerequisites/VC_redist.x64.exe` — pré-requisito Microsoft executado pelo setup;
+```powershell
+.\scripts\Publish.ps1 -Installer -BundleDependencies
+```
+
+Nesse modo explícito, `scripts/Prepare-Dependencies.ps1` pode criar:
+
+- `payload/` — ImageMagick, FFmpeg/FFprobe, Ghostscript e avisos/licenças;
+- `prerequisites/VC_redist.x64.exe`;
 - `.cache/` — downloads e extrações temporárias;
 - `bundle-manifest.json` — hashes e metadados do bundle.
 
-Em seguida `scripts/Test-DependencyBundle.ps1` valida o conteúdo antes do publish.
+`Test-DependencyBundle.ps1` valida esse conteúdo antes do publish. O workflow oficial de release não chama esse caminho.

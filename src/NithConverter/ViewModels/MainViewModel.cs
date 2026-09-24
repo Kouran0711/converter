@@ -399,7 +399,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         PdfStatus = result.GhostscriptPath is null ? "Não instalado" : "Instalado · pronto";
         DependencyStatus = result.ImageMagickPath is not null && result.FFmpegPath is not null && result.FFprobePath is not null && result.GhostscriptPath is not null
             ? "Todos os mecanismos de conversão estão instalados e prontos."
-            : "Instalação incompleta. Reinstale o NITH Converter para restaurar os componentes internos.";
+            : "Instalação incompleta. Execute novamente o instalador do NITH Converter; ele baixará e restaurará automaticamente os componentes ausentes.";
         await _logger.WriteAsync("dependencies", $"imagemagick={result.ImageMagickPath is not null}; ffmpeg={result.FFmpegPath is not null}; ffprobe={result.FFprobePath is not null}");
     }
     private async Task RefreshHistoryAsync()

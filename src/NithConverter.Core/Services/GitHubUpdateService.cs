@@ -11,7 +11,7 @@ namespace NithConverter.Core.Services;
 /// <summary>
 /// Atualização pública via GitHub Releases.
 /// A consulta principal lista as releases estáveis e escolhe a maior versão sem depender do marcador "Latest".
-/// O marcador Latest + manifesto continua como fallback quando a API pública do GitHub está indisponível.
+/// O manifesto Latest e a página de release são fallbacks quando a API pública do GitHub está indisponível.
 /// </summary>
 public sealed class GitHubUpdateService
 {
@@ -40,9 +40,9 @@ public sealed class GitHubUpdateService
         _downloadHttp = httpClient ?? CreateDownloadHttpClient();
 
         if (!_http.DefaultRequestHeaders.UserAgent.Any())
-            _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("NITHConverter", "1.0"));
+            _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("NITHConverter", "1.7.1"));
         if (!_downloadHttp.DefaultRequestHeaders.UserAgent.Any())
-            _downloadHttp.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("NITHConverter-Updater", "1.6"));
+            _downloadHttp.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("NITHConverter-Updater", "1.7.1"));
     }
 
     private static HttpClient CreateHttpClient() => CreateHttpClientCore(TimeSpan.FromSeconds(30));
@@ -74,15 +74,28 @@ public sealed class GitHubUpdateService
         LastKnownLatestVersion = null;
         LastCheckSource = "";
 
-        // Caminho principal: um arquivo pequeno e versionado publicado em toda release pelo nosso workflow.
-        // Isso evita depender do limite público da API do GitHub só para descobrir a versão.
+        // Caminho principal: a API lista as releases estáveis e permite escolher a MAIOR versão,
+        // sem depender do marcador Latest (que pode ficar atrasado ou ter sido configurado errado).
+        Exception? apiFailure = null;
+        try
+        {
+            ApiRelease? candidate = await GetHighestStableReleaseFromApiAsync(cancellationToken).ConfigureAwait(false);
+            LastCheckSource = "GitHub Releases API";
+            LastKnownLatestVersion = candidate?.Version;
+            if (candidate is null || candidate.Version <= current) return null;
+            return await BuildReleaseFromApiAsync(candidate, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception ex) when (IsRecoverableCheckFailure(ex)) { apiFailure = ex; }
+
+        // Fallback sem limite normal da API: manifesto pequeno da release marcada como Latest.
         Exception? manifestFailure = null;
         try
         {
             UpdateManifest? manifest = await TryReadManifestAsync(BuildLatestAssetUri(ManifestAssetName), cancellationToken).ConfigureAwait(false);
             if (manifest is not null)
             {
-                LastCheckSource = "Manifesto da release estável";
+                LastCheckSource = "Manifesto da release Latest";
                 LastKnownLatestVersion = manifest.Version;
                 if (manifest.Version <= current) return null;
 
@@ -101,20 +114,7 @@ public sealed class GitHubUpdateService
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception ex) when (IsRecoverableCheckFailure(ex)) { manifestFailure = ex; }
 
-        // Compatibilidade com releases antigas ou manifesto ausente: consulta a API pública.
-        Exception? apiFailure = null;
-        try
-        {
-            ApiRelease? candidate = await GetHighestStableReleaseFromApiAsync(cancellationToken).ConfigureAwait(false);
-            LastCheckSource = "GitHub Releases API";
-            LastKnownLatestVersion = candidate?.Version;
-            if (candidate is null || candidate.Version <= current) return null;
-            return await BuildReleaseFromApiAsync(candidate, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-        catch (Exception ex) when (IsRecoverableCheckFailure(ex)) { apiFailure = ex; }
-
-        // Último fallback: segue /releases/latest e tenta localizar os assets pelo nome conhecido.
+        // Último fallback: segue a página /releases/latest e tenta os nomes conhecidos.
         try
         {
             UpdateRelease? fallback = await TryGetLatestReleaseWithoutApiAsync(cancellationToken).ConfigureAwait(false);
@@ -128,14 +128,14 @@ public sealed class GitHubUpdateService
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception fallbackFailure) when (IsRecoverableCheckFailure(fallbackFailure))
         {
-            HttpStatusCode? status = (manifestFailure as HttpRequestException)?.StatusCode ??
-                                     (apiFailure as HttpRequestException)?.StatusCode ??
+            HttpStatusCode? status = (apiFailure as HttpRequestException)?.StatusCode ??
+                                     (manifestFailure as HttpRequestException)?.StatusCode ??
                                      (fallbackFailure as HttpRequestException)?.StatusCode;
-            string details = string.Join(" | ", new[] { manifestFailure?.Message, apiFailure?.Message, fallbackFailure.Message }
+            string details = string.Join(" | ", new[] { apiFailure?.Message, manifestFailure?.Message, fallbackFailure.Message }
                 .Where(value => !string.IsNullOrWhiteSpace(value)).Take(3));
             throw new HttpRequestException(
                 $"Não foi possível confirmar a versão mais recente no GitHub. {details}",
-                new AggregateException(new Exception?[] { manifestFailure, apiFailure, fallbackFailure }.OfType<Exception>()),
+                new AggregateException(new Exception?[] { apiFailure, manifestFailure, fallbackFailure }.OfType<Exception>()),
                 status);
         }
     }
@@ -479,7 +479,7 @@ public sealed class GitHubUpdateService
             "--fail", "--location", "--silent", "--show-error",
             "--retry", "4", "--retry-delay", "2", "--retry-all-errors",
             "--connect-timeout", "20", "--max-time", "1800",
-            "--user-agent", "NITHConverter-Updater/1.6",
+            "--user-agent", "NITHConverter-Updater/1.7.1",
             "--output", destination, uri.AbsoluteUri
         }) startInfo.ArgumentList.Add(argument);
 

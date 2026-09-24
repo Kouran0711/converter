@@ -54,7 +54,7 @@
             <StackPanel Spacing="4"><TextBlock Text="Documentos PDF / PS / EPS" FontWeight="SemiBold"/><TextBlock Text="{Binding PdfStatus}" Foreground="{StaticResource MutedForeground}"/></StackPanel>
           </Border>
         </Grid>
-        <TextBlock Text="Esses componentes fazem parte do instalador do NITH Converter. Você não precisa baixar ou instalar nada separadamente." TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedForeground}"/>
+        <TextBlock Text="O instalador do NITH Converter baixa e prepara automaticamente somente os componentes ausentes. Nenhuma janela de CMD ou PowerShell é exibida. Em atualizações, componentes já instalados são reutilizados." TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedForeground}"/>
       </StackPanel></Border>
 
       <Border Style="{StaticResource Card}"><StackPanel Spacing="14">

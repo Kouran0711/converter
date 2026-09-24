@@ -22,16 +22,18 @@ Conversor de arquivos para Windows feito para transformar imagens, documentos, v
 - Verificação de atualização pelo GitHub Releases.
 - Download automático do instalador de atualização, com verificação SHA-256 quando a release fornece hash/digest.
 
-> O instalador oficial gerado por este repositório já leva os mecanismos nativos necessários. A disponibilidade de formatos muito específicos ainda depende dos codecs/delegates presentes nos builds embarcados.
+> O instalador oficial baixa automaticamente os mecanismos necessários no computador do usuário. A disponibilidade de formatos muito específicos ainda depende dos codecs/delegates presentes nesses builds.
 
+## Dependências
 
-## Dependências incluídas no instalador
+O instalador oficial é **online**: o GitHub Actions compila apenas o NITH Converter. No computador do usuário, o próprio Setup baixa e prepara automaticamente os componentes ausentes, sem abrir CMD/PowerShell:
 
-Ao gerar um instalador ou uma release, `scripts/Prepare-Dependencies.ps1` baixa, confere e prepara automaticamente os mecanismos nativos usados pelo NITH Converter. O usuário final não precisa clicar em links nem instalar ImageMagick, FFmpeg ou Ghostscript manualmente.
+- ImageMagick portátil para imagens e formatos avançados.
+- FFmpeg + FFprobe (LGPL shared) para áudio e vídeo.
+- Ghostscript para PDF / PS / EPS.
+- Microsoft Visual C++ Redistributable x64 quando necessário.
 
-O pacote atual incorpora ImageMagick, FFmpeg/ffprobe e Ghostscript dentro da pasta privada do aplicativo. O Microsoft Visual C++ Redistributable x64 é levado pelo setup e executado silenciosamente antes do primeiro uso. `scripts/Test-DependencyBundle.ps1` confere hashes e inicia cada mecanismo no runner Windows; se algo essencial estiver ausente ou não iniciar, a release falha em vez de publicar um instalador incompleto.
-
-As versões/fontes ficam centralizadas em `scripts/Prepare-Dependencies.ps1` e no `bundle-manifest.json` gerado. Dependências futuras devem ser adicionadas a esse pipeline para manter o mesmo comportamento automático.
+Em atualizações, componentes que já existem são reutilizados. Isso mantém `NITH.Converter.exe` menor e evita downloads enormes durante todo build no GitHub.
 
 ## Atualizações automáticas
 
@@ -60,8 +62,8 @@ Requisitos recomendados:
 - Windows 10/11 x64
 - .NET 10 SDK (o `global.json` define a linha usada pelo projeto)
 - Visual Studio Build Tools/Visual Studio com ferramentas Windows/WinUI
-- Inno Setup 6.3+ para gerar o instalador
-- Internet durante o **build** para baixar e validar os runtimes oficiais/selecionados de ImageMagick, FFmpeg, Ghostscript e VC++ Runtime
+- Inno Setup 6.7.2+ para gerar o instalador online
+- Internet no computador do usuário durante a primeira instalação dos mecanismos nativos
 
 Publicar somente o aplicativo:
 
@@ -78,7 +80,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Publish.ps1 -Install
 Publicar uma versão específica:
 
 ```powershell
-.\scripts\Publish.ps1 -Installer -Version 1.7.0
+.\scripts\Publish.ps1 -Installer -Version 1.7.1
 ```
 
 Saídas:
@@ -95,11 +97,11 @@ O instalador exige administrador por projeto (`PrivilegesRequired=admin`). O apl
 Depois de enviar o código para o GitHub, uma release pode ser criada apenas com uma tag:
 
 ```powershell
-git tag v1.7.0
-git push origin v1.7.0
+git tag v1.7.1
+git push origin v1.7.1
 ```
 
-O GitHub Actions compila no Windows, cria o instalador, pacote portátil e checksums SHA-256 e publica a GitHub Release automaticamente.
+O GitHub Actions compila no Windows, cria o instalador online, gera o checksum SHA-256 e o `nith-update.json`, e publica a GitHub Release automaticamente. As dependências pesadas não são baixadas no runner.
 
 ## Estrutura
 

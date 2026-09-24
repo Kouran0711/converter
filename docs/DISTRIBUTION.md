@@ -2,38 +2,32 @@
 
 ## Publicação Windows x64
 
-O projeto usa .NET 10, WinUI 3/Windows App SDK e Windows 10 build 19041 ou posterior.
-
-Na raiz do projeto:
+O projeto usa .NET 10, WinUI 3/Windows App SDK e Windows 10 build 19041 ou posterior. A publicação do aplicativo é self-contained para .NET e Windows App SDK.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Publish.ps1
 ```
 
-O resultado fica em `artifacts/publish/win-x64/`. A publicação é self-contained para .NET e Windows App SDK.
+O resultado fica em `artifacts/publish/win-x64/`.
 
-## Instalador completo com dependências
+## Instalador online
 
-Para uma entrega destinada ao usuário final, execute:
+Para gerar a entrega ao usuário final:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Publish.ps1 -Installer -Version 1.7.0
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Publish.ps1 -Installer -Version 1.7.1
 ```
 
-Quando `-Installer` é usado, o build prepara automaticamente o pacote de dependências antes de publicar. Não é necessário usar um switch extra.
+O build **não baixa** ImageMagick, FFmpeg ou Ghostscript. O Inno Setup gera `NITH.Converter.exe` contendo apenas o aplicativo e as regras seguras de download. No PC do usuário, durante a instalação, o Setup verifica e prepara automaticamente:
 
-`scripts/Prepare-Dependencies.ps1` baixa e prepara:
+- ImageMagick portátil em `bin\ImageMagick`;
+- FFmpeg + FFprobe LGPL shared em `bin\FFmpeg`;
+- Ghostscript x64 para PDF/PS/EPS;
+- Microsoft Visual C++ Redistributable x64 quando necessário.
 
-- ImageMagick para imagens e criação/leitura de formatos avançados;
-- FFmpeg e ffprobe para áudio, vídeo, extração e progresso real;
-- Ghostscript para leitura de PDF/PS/EPS pelo ImageMagick;
-- Microsoft Visual C++ Redistributable x64 como pré-requisito do setup.
+Os downloads usam HTTPS dentro do próprio Inno Setup, respeitam proxy do Windows, seguem redirects e exibem progresso. Nenhuma janela de CMD ou PowerShell é necessária para essa instalação. Componentes já presentes são reutilizados.
 
-Os três mecanismos de conversão são colocados dentro de `bin/` na própria instalação do NITH Converter. O VC++ Runtime é executado silenciosamente pelo Inno Setup. Assim o usuário não precisa procurar nem clicar em instaladores externos.
-
-O build valida os downloads e gera `Installer/Dependencies/bundle-manifest.json` com hashes dos arquivos incorporados. `scripts/Test-DependencyBundle.ps1` verifica a integridade e faz smoke tests dos executáveis no runner Windows. Uma release não deve ser publicada se um mecanismo obrigatório faltar ou não iniciar.
-
-As pastas `Installer/Dependencies/.cache`, `payload` e `prerequisites` são geradas e ficam fora do Git.
+O modo antigo de bundle continua disponível apenas quando chamado explicitamente com `-BundleDependencies`; ele não é usado pelo workflow oficial.
 
 ## Logo e ícones
 
@@ -45,17 +39,25 @@ O setup é por máquina, instala normalmente em `Program Files\NITH Converter` e
 
 O Inno Setup usa `CloseApplications=yes` e `RestartApplications=yes`. Em atualização, ele fecha/reabre o aplicativo quando o Windows permitir.
 
+Requer Inno Setup 6.7.2 ou mais recente por causa de `download` + `extractarchive`.
+
 ## Atualizações pelo GitHub
 
-O canal oficial é `https://github.com/Kouran0711/converter/releases`.
+O canal oficial é `https://github.com/Kouran0711/converter/releases`. Cada release nova publica apenas:
 
-O aplicativo tenta primeiro o manifesto pequeno `nith-update.json` da release Latest. Para compatibilidade, também possui fallback pela API de Releases e pela página `/releases/latest`. O download do instalador usa um cliente separado com timeout longo, proxy do sistema e fallback pelo BITS e, por fim, pelo `curl.exe` do Windows.
+```text
+NITH.Converter.exe
+NITH.Converter.exe.sha256
+nith-update.json
+```
+
+O aplicativo tenta primeiro o manifesto pequeno `nith-update.json` da release Latest. Também possui fallback pela API de Releases e pela página `/releases/latest`. O download do instalador usa `HttpClient` com timeout longo e fallbacks BITS/curl ocultos. Como o instalador não carrega as dependências pesadas, o download de atualização também fica bem menor.
 
 Veja `docs/UPDATES.md`.
 
 ## Licenças de terceiros
 
-ImageMagick, FFmpeg e Ghostscript são projetos independentes. As licenças/avisos preparados pelo build acompanham o pacote. Ghostscript é disponibilizado pelo fornecedor sob AGPL ou licença comercial; revise a licença aplicável à forma de distribuição adotada pela Nith Digital.
+ImageMagick, FFmpeg e Ghostscript são projetos independentes. Ghostscript é disponibilizado pelo fornecedor sob AGPL ou licença comercial; revise a licença aplicável à forma de distribuição adotada pela Nith Digital antes de uma distribuição comercial/proprietária.
 
 ## Assinatura digital
 

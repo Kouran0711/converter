@@ -75,7 +75,7 @@ public sealed class WindowInteraction(Window window) : IWindowInteraction
             using Process? process = Process.Start(new ProcessStartInfo
             {
                 FileName = installerPath,
-                Arguments = "/SP- /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS",
+                Arguments = "/SP- /SILENT /NORESTART /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS",
                 WorkingDirectory = Path.GetDirectoryName(installerPath)!,
                 UseShellExecute = true,
                 Verb = "runas"

@@ -1,6 +1,7 @@
-; Build with scripts/Publish.ps1 -Installer, using Inno Setup 6.3 or later.
+; NITH Converter - instalador online.
+; Requer Inno Setup 6.7.2+ porque usa download + extractarchive em tempo de instalação.
 #ifndef AppVersion
-  #define AppVersion "1.7.0"
+  #define AppVersion "1.7.1"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\publish\win-x64"
@@ -11,7 +12,15 @@
 #define AppUpdatesURL "https://github.com/Kouran0711/converter/releases"
 #define AppExeName "NITHConverter.exe"
 #define BrandIcon "NITH Converter " + AppVersion + ".ico"
-#define DependenciesDir "Dependencies"
+
+; Componentes nativos baixados NO COMPUTADOR DO USUÁRIO, durante a instalação.
+; Assim o GitHub Actions não precisa baixar centenas de MB para toda release.
+#define ImageMagickUrl "https://download.imagemagick.org/archive/binaries/ImageMagick-7.1.2-31-portable-Q16-HDRI-x64.7z"
+#define ImageMagickHash "a6a83a77a5284a2cae5ca4a81d95e5fad21ecd56cdb647ee99f970e233504fff"
+#define FFmpegUrl "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-22-13-18/ffmpeg-n9.0.2-3-ga5923073bf-win64-lgpl-shared-9.0.zip"
+#define GhostscriptUrl "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10080/gs10080w64.exe"
+#define GhostscriptHash "52a91b8bf09298788d7a57b9206127026c23eacd75405f0a131e26dc381dce50"
+#define VCRedistUrl "https://aka.ms/vc14/vc_redist.x64.exe"
 
 [Setup]
 AppId={{5A22F590-A9F0-4B54-A732-F1E83C00A277}
@@ -36,7 +45,9 @@ SetupIconFile={#PublishDir}\Assets\Brand\NithConverter.ico
 UninstallDisplayIcon={app}\{#BrandIcon}
 Compression=lzma2
 SolidCompression=yes
+ArchiveExtraction=full
 WizardStyle=modern
+WizardResizable=yes
 CloseApplications=yes
 RestartApplications=yes
 UsePreviousAppDir=yes
@@ -51,21 +62,141 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Criar um atalho na área de trabalho"; GroupDescription: "Atalhos:"; Flags: unchecked
 
 [Files]
+; ImageMagick: pacote portátil privado do app. Download e extração são feitos pelo Setup.
+Source: "{#ImageMagickUrl}"; DestDir: "{app}\bin\ImageMagick"; DestName: "ImageMagick-7.1.2-31-portable-Q16-HDRI-x64.7z"; ExternalSize: 150_000_000; Hash: "{#ImageMagickHash}"; Flags: external download extractarchive ignoreversion; Check: NeedImageMagick
+
+; FFmpeg/FFprobe: build LGPL compartilhado, menor que o pacote estático. O ZIP possui pasta raiz própria;
+; o aplicativo faz descoberta recursiva dentro de bin.
+Source: "{#FFmpegUrl}"; DestDir: "{app}\bin\FFmpeg"; DestName: "ffmpeg-n9.0.2-3-ga5923073bf-win64-lgpl-shared-9.0.zip"; ExternalSize: 350_000_000; Flags: external download extractarchive ignoreversion; Check: NeedFFmpeg
+
+; Pré-requisitos de sistema: são apenas baixados para a pasta temporária e executados em modo oculto.
+Source: "{#GhostscriptUrl}"; DestDir: "{tmp}"; DestName: "gs10080w64.exe"; ExternalSize: 66_000_000; Hash: "{#GhostscriptHash}"; Flags: external download ignoreversion; Check: NeedGhostscript
+Source: "{#VCRedistUrl}"; DestDir: "{tmp}"; DestName: "VC_redist.x64.exe"; ExternalSize: 32_000_000; Flags: external download ignoreversion; Check: NeedVCRuntime
+
+; Aplicativo propriamente dito. Nenhum mecanismo pesado é empacotado pelo GitHub Actions.
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#PublishDir}\Assets\Brand\NithConverter.ico"; DestDir: "{app}"; DestName: "{#BrandIcon}"; Flags: ignoreversion
-Source: "{#DependenciesDir}\prerequisites\VC_redist.x64.exe"; DestDir: "{tmp}"; DestName: "VC_redist.x64.exe"; Flags: deleteafterinstall
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#BrandIcon}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#BrandIcon}"; Tasks: desktopicon
 
 [Run]
-Filename: "{tmp}\VC_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Preparando componentes nativos do Windows..."; Flags: waituntilterminated runhidden
-; Corrige instalações anteriores que ocultavam a pasta inteira. Primeiro restaura a visibilidade
-; de todos os arquivos e diretórios; depois oculta SOMENTE o lixo técnico no diretório raiz.
-; Pastas, desinstalador, executável principal e arquivos de suporte importantes permanecem visíveis.
+; Nenhum terminal é mostrado. Se já estiver instalado, o Check pula completamente a etapa.
+Filename: "{tmp}\VC_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Instalando Microsoft Visual C++ Runtime..."; Flags: waituntilterminated runhidden; Check: NeedVCRuntime; AfterInstall: VerifyVCRuntime
+Filename: "{tmp}\gs10080w64.exe"; Parameters: "/S"; StatusMsg: "Instalando mecanismo de documentos PDF / PS / EPS..."; Flags: waituntilterminated runhidden; Check: NeedGhostscript; AfterInstall: VerifyGhostscript
+
+; Corrige instalações antigas que ocultavam a pasta inteira. Em seguida oculta só o lixo técnico na raiz.
 Filename: "{cmd}"; Parameters: "/C attrib -h ""{app}\*"" /S /D >nul 2>&1 & exit /b 0"; Flags: runhidden waituntilterminated
 Filename: "{cmd}"; Parameters: "/C attrib +h ""{app}\*.dll"" >nul 2>&1 & attrib +h ""{app}\*.json"" >nul 2>&1 & attrib +h ""{app}\*.pri"" >nul 2>&1 & attrib +h ""{app}\*.pdb"" >nul 2>&1 & attrib +h ""{app}\*.xml"" >nul 2>&1 & attrib +h ""{app}\*.winmd"" >nul 2>&1 & attrib +h ""{app}\RestartAgent.exe"" >nul 2>&1 & attrib +h ""{app}\{#BrandIcon}"" >nul 2>&1 & attrib -h ""{app}\{#AppExeName}"" >nul 2>&1 & attrib -h ""{app}\unins*.exe"" >nul 2>&1 & attrib -h ""{app}\unins*.dat"" >nul 2>&1 & exit /b 0"; Flags: runhidden waituntilterminated
 Filename: "{app}\{#AppExeName}"; Description: "Abrir {#AppName}"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
-; Settings, logs, histórico e arquivos do usuário ficam fora da pasta do programa.
+[Code]
+var
+  DependencyPage: TOutputMsgMemoWizardPage;
+
+function ContainsFileRecursive(const Root, FileName: String; Depth: Integer): Boolean;
+var
+  FindRec: TFindRec;
+  Child: String;
+begin
+  Result := False;
+  if (Root = '') or (Depth < 0) then
+    Exit;
+
+  if FileExists(AddBackslash(Root) + FileName) then
+  begin
+    Result := True;
+    Exit;
+  end;
+
+  if (Depth = 0) or (not DirExists(Root)) then
+    Exit;
+
+  if FindFirst(AddBackslash(Root) + '*', FindRec) then
+  begin
+    try
+      repeat
+        if ((FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0) and
+           (FindRec.Name <> '.') and (FindRec.Name <> '..') then
+        begin
+          Child := AddBackslash(Root) + FindRec.Name;
+          if ContainsFileRecursive(Child, FileName, Depth - 1) then
+          begin
+            Result := True;
+            Exit;
+          end;
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+end;
+
+function NeedImageMagick: Boolean;
+begin
+  Result := not ContainsFileRecursive(ExpandConstant('{app}\bin\ImageMagick'), 'magick.exe', 6);
+end;
+
+function NeedFFmpeg: Boolean;
+var
+  Root: String;
+begin
+  Root := ExpandConstant('{app}\bin\FFmpeg');
+  Result := (not ContainsFileRecursive(Root, 'ffmpeg.exe', 6)) or
+            (not ContainsFileRecursive(Root, 'ffprobe.exe', 6));
+end;
+
+function NeedGhostscript: Boolean;
+var
+  PF: String;
+begin
+  if ContainsFileRecursive(ExpandConstant('{app}\bin\Ghostscript'), 'gswin64c.exe', 6) then
+  begin
+    Result := False;
+    Exit;
+  end;
+
+  PF := ExpandConstant('{autopf}\gs');
+  Result := not ContainsFileRecursive(PF, 'gswin64c.exe', 5);
+end;
+
+function NeedVCRuntime: Boolean;
+var
+  Installed: Cardinal;
+begin
+  Installed := 0;
+  Result := (not RegQueryDWordValue(HKLM64,
+    'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64', 'Installed', Installed)) or
+    (Installed <> 1);
+end;
+
+procedure VerifyVCRuntime;
+begin
+  if NeedVCRuntime then
+    RaiseException('O Microsoft Visual C++ Runtime não foi instalado corretamente. Execute o instalador novamente.');
+end;
+
+procedure VerifyGhostscript;
+begin
+  if NeedGhostscript then
+    RaiseException('O mecanismo Ghostscript não foi instalado corretamente. Execute o instalador novamente.');
+end;
+
+procedure InitializeWizard;
+begin
+  DependencyPage := CreateOutputMsgMemoPage(wpSelectDir,
+    'Componentes necessários',
+    'O NITH Converter prepara automaticamente tudo o que precisa para funcionar.',
+    'Clique em Avançar. Componentes que já estiverem instalados serão ignorados.',
+    'ImageMagick' + #13#10 +
+    '  Imagens, formatos avançados e criação de PDF.' + #13#10#13#10 +
+    'FFmpeg + FFprobe' + #13#10 +
+    '  Áudio, vídeo, extração de áudio e progresso das conversões.' + #13#10#13#10 +
+    'Ghostscript' + #13#10 +
+    '  Leitura de PDF, PS e EPS.' + #13#10#13#10 +
+    'Microsoft Visual C++ Runtime' + #13#10 +
+    '  Bibliotecas nativas exigidas por componentes do aplicativo.' + #13#10#13#10 +
+    'Os downloads acontecem dentro deste instalador. Nenhuma janela de CMD ou PowerShell será aberta.');
+end;

@@ -1,0 +1,8 @@
+NITH Converter 1.7.1
+
+- Novo instalador online: dependências são baixadas no PC do usuário, não no GitHub Actions.
+- ImageMagick, FFmpeg/FFprobe, Ghostscript e Microsoft Visual C++ Runtime são preparados automaticamente.
+- Componentes existentes são reutilizados.
+- Nenhuma janela de CMD/PowerShell é aberta.
+- Atualizador continua usando NITH.Converter.exe + SHA-256 + nith-update.json, agora com instalador menor.
+- O atualizador verifica a maior release estável pela API e usa manifesto Latest/página Latest como fallbacks.

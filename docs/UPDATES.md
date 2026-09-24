@@ -5,9 +5,9 @@ Este projeto usa GitHub Releases como canal de atualização.
 ## Fluxo atual
 
 1. O aplicativo lê a versão gravada no executável.
-2. Tenta baixar `releases/latest/download/nith-update.json`, que é pequeno e não depende do limite normal da API para a descoberta básica.
-3. Se o manifesto não estiver disponível, consulta até 100 releases pela API e escolhe a maior versão estável `vX.Y.Z`.
-4. Como último fallback, segue `/releases/latest`.
+2. Consulta até 100 releases pela API pública do GitHub, ignora drafts/pre-releases e escolhe a maior versão estável `vX.Y.Z`. Isso evita depender de um marcador `Latest` atrasado.
+3. Se a API estiver indisponível ou limitada temporariamente, tenta `releases/latest/download/nith-update.json`, um manifesto pequeno publicado junto com a release.
+4. Como último fallback, segue `/releases/latest` e tenta localizar o instalador pelos nomes conhecidos.
 5. Quando encontra versão superior, identifica `NITH.Converter.exe` e o SHA-256 publicado.
 6. O instalador é baixado para `%LOCALAPPDATA%\NITH Converter\Updates`.
 7. O download principal usa `HttpClient` com timeout de até 30 minutos, HTTP/1.1 compatível com proxies, proxy do sistema e credenciais padrão quando aplicável.
@@ -30,8 +30,6 @@ O workflow publica no mínimo:
 ```text
 NITH.Converter.exe
 NITH.Converter.exe.sha256
-NITH.Converter.Portable.zip
-NITH.Converter.Portable.zip.sha256
 nith-update.json
 ```
 
@@ -39,21 +37,24 @@ Exemplo do manifesto:
 
 ```json
 {
-  "schema": 2,
-  "version": "1.7.0",
-  "tag": "v1.7.0",
-  "title": "NITH Converter 1.7.0",
+  "schema": 3,
+  "version": "1.7.1",
+  "tag": "v1.7.1",
+  "title": "NITH Converter 1.7.1",
   "installer": "NITH.Converter.exe",
   "sha256": "...",
-  "size": 123456789
+  "size": 123456789,
+  "installer_type": "online"
 }
 ```
 
 O número da versão vem do manifesto/tag e dos metadados do executável; ele não precisa fazer parte do nome do instalador.
 
+O instalador de atualização é propositalmente menor: ImageMagick, FFmpeg/FFprobe, Ghostscript e VC++ Runtime não são enviados em cada release. O próprio Setup verifica o que já existe e baixa somente o que estiver ausente no computador.
+
 ## Publicação
 
-Pelo GitHub Actions, use **Build e publicar release → Run workflow** e informe a versão, por exemplo `1.7.0`. O workflow prepara as dependências, publica o app, valida os mecanismos, gera o instalador e os checksums, cria/atualiza a release estável e confirma os assets obrigatórios.
+Pelo GitHub Actions, use **Build e publicar release → Run workflow** e informe a versão, por exemplo `1.7.1`. O workflow compila o app e gera um instalador online pequeno. As dependências pesadas são baixadas pelo próprio instalador no PC do usuário; depois o workflow gera SHA-256/manifesto, publica a release estável e valida o canal público.
 
 Também é possível disparar pelo push de uma tag `vX.Y.Z`.
 

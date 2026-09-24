@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.7.1
+- Dependências pesadas deixaram de ser baixadas pelo GitHub Actions.
+- O instalador online baixa ImageMagick, FFmpeg/FFprobe, Ghostscript e VC++ Runtime diretamente no PC do usuário, mostrando progresso e sem abrir CMD/PowerShell.
+- Componentes já instalados são detectados e reutilizados.
+- ImageMagick e FFmpeg ficam privados na pasta do NITH Converter; Ghostscript e VC++ são instalados silenciosamente como pré-requisitos do Windows.
+- Descoberta de ImageMagick/FFmpeg agora é recursiva para aceitar a estrutura dos pacotes oficiais.
+- Releases ficaram menores: o canal de atualização publica apenas instalador, SHA-256 e nith-update.json.
+- Atualizações abrem o instalador em modo silencioso com janela de progresso, permitindo visualizar downloads/erros de dependências sem console.
+- Verificação de atualização consulta primeiro a lista de releases estáveis e escolhe a maior versão; manifesto Latest e página Latest ficam como fallbacks.
+- Downloads de dependências usam o mecanismo nativo do Inno Setup, com HTTPS, redirects, proxy do Windows e opção de tentar novamente quando uma origem falha.
+- Workflow fixa Inno Setup 6.7.3 e valida o SHA-256 do compilador para evitar bugs de extração de versões antigas.
+
 ## 1.7.0
 - Corrigido erro de sintaxe do PowerShell que interrompia o GitHub Actions antes da preparação das dependências.
 - Preparação de dependências mais resiliente: consulta de digest do FFmpeg virou validação adicional, sem bloquear o build quando o GitHub não publica digest.

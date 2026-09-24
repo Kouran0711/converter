@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Versão da release (ex.: 1.7.0)'
+        description: 'Versão da release (ex.: 1.7.1)'
         required: true
-        default: '1.7.0'
+        default: '1.7.1'
         type: string
 
 permissions:
@@ -18,7 +18,7 @@ permissions:
 jobs:
   release:
     runs-on: windows-latest
-    timeout-minutes: 90
+    timeout-minutes: 45
 
     steps:
       - name: Baixar código
@@ -37,9 +37,34 @@ jobs:
           dotnet --info
           git --version
 
-      - name: Instalar Inno Setup
+      - name: Instalar Inno Setup 6.7.3
         shell: pwsh
-        run: choco install innosetup --no-progress -y
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $url = 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe'
+          $expected = '9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732'
+          $setup = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+
+          & curl.exe --fail --location --silent --show-error --retry 4 --retry-delay 2 --output $setup $url
+          if ($LASTEXITCODE -ne 0) { throw 'Falha ao baixar o compilador Inno Setup 6.7.3.' }
+
+          $sha = [Security.Cryptography.SHA256]::Create()
+          $stream = [IO.File]::OpenRead($setup)
+          try {
+            $actual = ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace('-', '').ToLowerInvariant()
+          }
+          finally {
+            $stream.Dispose()
+            $sha.Dispose()
+          }
+          if ($actual -ne $expected) { throw "SHA-256 inesperado do Inno Setup: $actual" }
+
+          $proc = Start-Process -FilePath $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-' -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { throw "Instalação do Inno Setup falhou com código $($proc.ExitCode)." }
+
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path -LiteralPath $iscc)) { throw 'ISCC.exe 6.7.3 não foi encontrado após a instalação.' }
+          Write-Host "Inno Setup pronto: $iscc"
 
       - name: Definir versão
         id: version
@@ -63,7 +88,7 @@ jobs:
           Write-Host "Versão: $version"
           Write-Host "Tag: $tag"
 
-      - name: Validar sintaxe dos scripts PowerShell
+      - name: Validar scripts e arquitetura do instalador
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -81,28 +106,32 @@ jobs:
             }
           }
           if ($failed) { throw 'Há scripts PowerShell com erro de sintaxe.' }
-          Write-Host 'Sintaxe PowerShell validada.'
 
-      - name: Publicar aplicativo e instalador
+          $iss = Get-Content .\Installer\NithConverter.iss -Raw
+          foreach ($required in @('external download extractarchive', 'NeedImageMagick', 'NeedFFmpeg', 'NeedGhostscript', 'NeedVCRuntime')) {
+            if ($iss -notmatch [regex]::Escape($required)) { throw "Instalador online incompleto: faltou $required" }
+          }
+          Write-Host 'Scripts e instalador online validados.'
+
+      - name: Publicar aplicativo e instalador pequeno
         shell: pwsh
         run: |
           .\scripts\Publish.ps1 -Installer -Version '${{ steps.version.outputs.version }}'
 
-      - name: Confirmar mecanismos incorporados
+      - name: Confirmar que dependências pesadas não foram baixadas no CI
         shell: pwsh
         run: |
-          $required = @(
+          $unexpected = @(
             '.\artifacts\publish\win-x64\bin\ImageMagick\magick.exe',
             '.\artifacts\publish\win-x64\bin\FFmpeg\ffmpeg.exe',
-            '.\artifacts\publish\win-x64\bin\FFmpeg\ffprobe.exe',
             '.\artifacts\publish\win-x64\bin\Ghostscript\bin\gswin64c.exe'
           )
-          foreach ($file in $required) {
-            if (-not (Test-Path -LiteralPath $file)) { throw "Dependência não foi incorporada ao release: $file" }
+          foreach ($file in $unexpected) {
+            if (Test-Path -LiteralPath $file) { throw "O CI voltou a incorporar uma dependência pesada: $file" }
           }
-          Write-Host 'ImageMagick, FFmpeg, FFprobe e Ghostscript estão dentro do pacote final.'
+          Write-Host 'OK: dependências serão baixadas no PC do usuário pelo instalador.'
 
-      - name: Criar pacote portátil, manifesto e checksums
+      - name: Criar manifesto e checksum do atualizador
         id: assets
         shell: pwsh
         run: |
@@ -113,9 +142,7 @@ jobs:
             Select-Object -First 1
 
           if (-not $installer) { throw 'Instalador não encontrado.' }
-
-          $portable = Join-Path $installer.Directory.FullName 'NITH.Converter.Portable.zip'
-          Compress-Archive -Path .\artifacts\publish\win-x64\* -DestinationPath $portable -Force
+          if ($installer.Name -ne 'NITH.Converter.exe') { throw "Nome inesperado do instalador: $($installer.Name)" }
 
           function Get-Sha256Hex([string]$Path) {
             $sha = [Security.Cryptography.SHA256]::Create()
@@ -131,28 +158,26 @@ jobs:
           }
 
           $installerHash = Get-Sha256Hex $installer.FullName
-          $portableHash = Get-Sha256Hex $portable
           "$installerHash  $($installer.Name)" |
             Set-Content -LiteralPath "$($installer.FullName).sha256" -Encoding ascii
-          "$portableHash  $([IO.Path]::GetFileName($portable))" |
-            Set-Content -LiteralPath "$portable.sha256" -Encoding ascii
 
           $manifestPath = Join-Path $installer.Directory.FullName 'nith-update.json'
           $manifest = [ordered]@{
-            schema = 2
+            schema = 3
             version = $version
             tag = $tag
             title = "NITH Converter $version"
             installer = $installer.Name
             sha256 = $installerHash
             size = $installer.Length
+            installer_type = 'online'
+            dependencies = @('ImageMagick', 'FFmpeg+FFprobe', 'Ghostscript', 'VC++ Runtime')
             release_url = "https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag"
-            generated_utc = [DateTimeOffset]::UtcNow.ToString("O")
-          } | ConvertTo-Json
+            generated_utc = [DateTimeOffset]::UtcNow.ToString('O')
+          } | ConvertTo-Json -Depth 4
           [IO.File]::WriteAllText($manifestPath, $manifest, [Text.UTF8Encoding]::new($false))
 
           "installer=$($installer.FullName)" >> $env:GITHUB_OUTPUT
-          "portable=$portable" >> $env:GITHUB_OUTPUT
           "manifest=$manifestPath" >> $env:GITHUB_OUTPUT
 
       - name: Publicar ou atualizar GitHub Release
@@ -162,16 +187,8 @@ jobs:
         run: |
           $tag = '${{ steps.version.outputs.tag }}'
           $installer = '${{ steps.assets.outputs.installer }}'
-          $portable = '${{ steps.assets.outputs.portable }}'
           $manifest = '${{ steps.assets.outputs.manifest }}'
-
-          $assets = @(
-            $installer,
-            "$installer.sha256",
-            $portable,
-            "$portable.sha256",
-            $manifest
-          )
+          $assets = @($installer, "$installer.sha256", $manifest)
 
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) {
@@ -192,23 +209,15 @@ jobs:
           }
 
           $published = gh release view $tag --json tagName,isDraft,isPrerelease,assets,url | ConvertFrom-Json
-          if ($published.isDraft -or $published.isPrerelease) {
-            throw "A release $tag não foi publicada como release estável."
-          }
-          $requiredNames = @(
-            [IO.Path]::GetFileName($installer),
-            [IO.Path]::GetFileName("$installer.sha256"),
-            [IO.Path]::GetFileName($manifest)
-          )
+          if ($published.isDraft -or $published.isPrerelease) { throw "A release $tag não foi publicada como estável." }
+          $requiredNames = @([IO.Path]::GetFileName($installer), [IO.Path]::GetFileName("$installer.sha256"), [IO.Path]::GetFileName($manifest))
           $publishedNames = @($published.assets | ForEach-Object { $_.name })
           foreach ($required in $requiredNames) {
             if ($publishedNames -notcontains $required) { throw "Asset obrigatório ausente na release: $required" }
           }
 
           $latestTag = gh release view --json tagName --jq '.tagName'
-          if ($LASTEXITCODE -ne 0 -or $latestTag.Trim() -ne $tag) {
-            throw "A release $tag foi publicada, mas o GitHub não a marcou como Latest."
-          }
+          if ($LASTEXITCODE -ne 0 -or $latestTag.Trim() -ne $tag) { throw "A release $tag não ficou marcada como Latest." }
           Write-Host "Release $tag publicada e marcada como Latest: $($published.url)"
 
       - name: Validar canal público de atualização
@@ -219,18 +228,20 @@ jobs:
           $tag = '${{ steps.version.outputs.tag }}'
           $manifestUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/latest/download/nith-update.json"
           $manifest = $null
-          for ($attempt = 1; $attempt -le 6; $attempt++) {
+
+          for ($attempt = 1; $attempt -le 9; $attempt++) {
             try {
-              $manifest = Invoke-RestMethod -Uri $manifestUrl -MaximumRedirection 10 -Headers @{ 'User-Agent' = 'NITHConverter-ReleaseValidator/1.6' }
+              $manifest = Invoke-RestMethod -Uri $manifestUrl -MaximumRedirection 10 -Headers @{ 'User-Agent' = 'NITHConverter-ReleaseValidator/1.7.1' }
               if ($manifest.version -eq $version -and $manifest.tag -eq $tag) { break }
               throw "Manifesto Latest ainda aponta para $($manifest.version) / $($manifest.tag)."
             }
             catch {
-              if ($attempt -eq 6) { throw }
-              Write-Host "Latest ainda propagando ($attempt/6): $($_.Exception.Message)"
+              if ($attempt -eq 9) { throw }
+              Write-Host "Aguardando propagação do Latest ($attempt/9): $($_.Exception.Message)"
               Start-Sleep -Seconds 10
             }
           }
+
           if ($null -eq $manifest) { throw 'Manifesto público não pôde ser lido.' }
           if ($manifest.installer -ne 'NITH.Converter.exe') { throw "Nome inesperado no manifesto: $($manifest.installer)" }
 
@@ -252,7 +263,6 @@ jobs:
           name: NITH-Converter-${{ steps.version.outputs.version }}
           if-no-files-found: warn
           path: |
-            artifacts/installer/*.exe
-            artifacts/installer/*.sha256
-            artifacts/installer/*.zip
+            artifacts/installer/NITH.Converter.exe
+            artifacts/installer/NITH.Converter.exe.sha256
             artifacts/installer/nith-update.json

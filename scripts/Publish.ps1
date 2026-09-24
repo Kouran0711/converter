@@ -24,9 +24,10 @@ if (-not [string]::IsNullOrWhiteSpace($Version) -and $Version -notmatch '^\d+\.\
     throw 'Versão inválida. Use o formato 1.2.3 ou 1.2.3.4.'
 }
 
-# Releases/instaladores são sempre autocontidos: os mecanismos nativos são preparados e
-# validados antes do publish. O switch antigo continua aceito por compatibilidade.
-$includeDependencies = $Installer -or $BundleDependencies
+# O instalador ONLINE não baixa nem incorpora os mecanismos no GitHub Actions.
+# Eles são obtidos pelo próprio Setup no computador do usuário.
+# -BundleDependencies permanece disponível somente para builds offline explícitos.
+$includeDependencies = $BundleDependencies
 if ($includeDependencies) {
     $dependencyManifest = Join-Path $projectRoot 'Installer\Dependencies\bundle-manifest.json'
     if (-not $SkipDependencyPreparation -or -not (Test-Path -LiteralPath $dependencyManifest)) {
@@ -121,7 +122,7 @@ if ($Installer) {
         }
     }
     if ([string]::IsNullOrWhiteSpace($IsccPath) -or -not (Test-Path -LiteralPath $IsccPath)) {
-        throw 'Aplicativo publicado. Para gerar o instalador, instale Inno Setup 6.3+ e informe -IsccPath se necessário.'
+        throw 'Aplicativo publicado. Para gerar o instalador online, instale Inno Setup 6.7.2+ e informe -IsccPath se necessário.'
     }
     $installerVersion = if (-not [string]::IsNullOrWhiteSpace($Version)) { $Version } else { [Diagnostics.FileVersionInfo]::GetVersionInfo($executable).FileVersion }
     & $IsccPath "/DAppVersion=$installerVersion" "/DPublishDir=$publishDirectory" (Join-Path $projectRoot 'Installer\NithConverter.iss')
