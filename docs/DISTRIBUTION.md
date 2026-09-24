@@ -60,7 +60,7 @@ O canal oficial é:
 https://github.com/Kouran0711/converter/releases
 ```
 
-A atualização automática espera um instalador e checksum SHA-256 na mesma release. O workflow `.github/workflows/release.yml` produz esses arquivos automaticamente ao receber uma tag `vX.Y.Z`.
+A atualização automática usa `nith-update.json` como fonte principal e mantém compatibilidade com instalador + checksum SHA-256. O workflow `.github/workflows/release.yml` produz esses arquivos automaticamente ao receber uma tag `vX.Y.Z` ou execução manual.
 
 Veja `docs/UPDATES.md`.
 

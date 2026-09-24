@@ -1,0 +1,11 @@
+NITH Converter 1.3.1
+
+Principais ajustes:
+- interface refeita para usar praticamente toda a largura disponível;
+- painel de opções corrigido para não cortar títulos/botões;
+- ícone novo aplicado ao executável, janela, instalador e atalhos;
+- atualização via GitHub reforçada com nith-update.json e fallback para API;
+- instalador da release passa a se chamar apenas NITH Converter.exe;
+- arquivos internos do runtime ficam ocultos no Explorer por padrão;
+- conversão de áudio permanece disponível;
+- versão exibida continua vindo da versão real do build.

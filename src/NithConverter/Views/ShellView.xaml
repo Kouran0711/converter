@@ -5,10 +5,10 @@
       <RowDefinition Height="*"/>
     </Grid.RowDefinitions>
 
-    <Border Grid.Row="0" Background="#0A1220" BorderBrush="#18528B" BorderThickness="0,0,0,1">
+    <Border Grid.Row="0" Background="#07111F" BorderBrush="#18528B" BorderThickness="0,0,0,1">
       <Grid x:Name="TitleBar" Padding="18,0,140,0">
         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-          <Image Source="ms-appx:///Assets/Generated/logo-48.png" Width="28" Height="28"/>
+          <Image Source="ms-appx:///Assets/Generated/logo-48.png" Width="30" Height="30" Stretch="Uniform"/>
           <TextBlock Text="NITH Converter" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
         </StackPanel>
       </Grid>
@@ -30,8 +30,8 @@
                     HorizontalContentAlignment="Stretch"
                     VerticalContentAlignment="Stretch">
       <NavigationView.PaneHeader>
-        <StackPanel Margin="12,18,12,20" Spacing="14">
-          <Image Source="ms-appx:///Assets/Generated/logo-256.png" Width="108" Height="108" HorizontalAlignment="Left"/>
+        <StackPanel Margin="12,16,12,18" Spacing="12">
+          <Image Source="ms-appx:///Assets/Generated/logo-256.png" Width="112" Height="112" HorizontalAlignment="Left" Stretch="Uniform"/>
           <StackPanel Spacing="2">
             <TextBlock Text="NITH" FontSize="20" FontWeight="Bold" CharacterSpacing="190" />
             <TextBlock Text="CONVERTER" FontSize="9" CharacterSpacing="220" Foreground="{StaticResource MutedForeground}" />
@@ -47,18 +47,24 @@
         </NavigationViewItem>
       </NavigationView.MenuItems>
       <NavigationView.PaneFooter>
-        <StackPanel Margin="16,10,16,18" Spacing="8">
+        <StackPanel Margin="16,10,16,18" Spacing="7">
           <TextBlock Text="LOCAL. SIMPLES. NATIVO." FontSize="9" CharacterSpacing="80" Foreground="{StaticResource MutedForeground}"/>
           <TextBlock Text="{Binding AppVersionText}" FontSize="11" Foreground="White"/>
           <TextBlock Text="Nith Digital" FontSize="10" Foreground="#8AB4D8"/>
         </StackPanel>
       </NavigationView.PaneFooter>
-      <Grid x:Name="ContentViewport" Margin="24,18,24,18" HorizontalAlignment="Stretch">
-        <Grid Width="{Binding ActualWidth, ElementName=ContentViewport}" MaxWidth="1460" HorizontalAlignment="Center">
-          <views:ConverterPage x:Name="ConverterPage"/>
-          <views:HistoryPage x:Name="HistoryPage" Visibility="Collapsed"/>
-          <views:SettingsPage x:Name="SettingsPage" Visibility="Collapsed"/>
-        </Grid>
+
+      <Grid x:Name="ContentViewport" Margin="18,16,18,16" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+        <Grid.Background>
+          <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#0B1627" Offset="0"/>
+            <GradientStop Color="#0D2037" Offset="0.55"/>
+            <GradientStop Color="#081421" Offset="1"/>
+          </LinearGradientBrush>
+        </Grid.Background>
+        <views:ConverterPage x:Name="ConverterPage" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+        <views:HistoryPage x:Name="HistoryPage" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+        <views:SettingsPage x:Name="SettingsPage" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
       </Grid>
     </NavigationView>
   </Grid>

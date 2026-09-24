@@ -13,7 +13,7 @@ Confirme que existem:
 
 ```text
 artifacts/publish/win-x64/NITHConverter.exe
-artifacts/installer/NITHConverter-Setup-x64-*.exe
+artifacts/installer/NITH Converter.exe
 ```
 
 ## Interface

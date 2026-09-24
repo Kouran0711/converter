@@ -6,13 +6,14 @@ Este projeto já está preparado para usar **GitHub Releases** como canal de atu
 
 1. O NITH Converter inicia normalmente.
 2. Se **Verificar ao abrir o aplicativo** estiver ativado, consulta a release pública mais recente em `Kouran0711/converter`.
-3. Compara a tag da release (`v1.2.1`, por exemplo) com a versão do executável instalado.
-4. Se existir uma versão superior, procura o instalador `NITHConverter-Setup-x64-*.exe` e seu `.sha256`.
-5. Se **Baixar novas versões automaticamente** estiver ativado, baixa os dois em `%LOCALAPPDATA%\NITH Converter\Updates`.
-6. O SHA-256 do instalador baixado é comparado com o checksum publicado.
-7. Depois da validação, aparece **Instalar agora**.
-8. O instalador é iniciado com elevação (`runas`), então o Windows mostra UAC.
-9. O Inno Setup atualiza a instalação em `Program Files`. Ele foi configurado com `PrivilegesRequired=admin`, `CloseApplications=yes` e `RestartApplications=yes`.
+3. Compara a tag da release (`v1.3.1`, por exemplo) com a versão do executável instalado.
+4. O app tenta primeiro baixar `nith-update.json` da release mais recente. Se o manifesto ainda não existir, usa a API do GitHub como compatibilidade.
+5. Quando existe uma versão superior, baixa `NITH Converter.exe` e valida o SHA-256 antes de oferecer a instalação.
+6. Se **Baixar novas versões automaticamente** estiver ativado, baixa o instalador em `%LOCALAPPDATA%\NITH Converter\Updates`.
+7. O SHA-256 do instalador baixado é comparado com o valor publicado no manifesto (ou no `.sha256` das releases antigas).
+8. Depois da validação, aparece **Instalar agora**.
+9. O instalador é iniciado com elevação (`runas`), então o Windows mostra UAC.
+10. O Inno Setup atualiza a instalação em `Program Files`. Ele foi configurado com `PrivilegesRequired=admin`, `CloseApplications=yes` e `RestartApplications=yes`.
 
 ## Primeira publicação no GitHub
 
@@ -21,7 +22,7 @@ Na pasta do projeto:
 ```powershell
 git init
 git add .
-git commit -m "NITH Converter 1.2.0"
+git commit -m "NITH Converter 1.3.1"
 git branch -M main
 git remote add origin https://github.com/Kouran0711/converter.git
 git push -u origin main
@@ -37,11 +38,11 @@ git push -u origin main
 
 ## Criar a primeira release
 
-O código desta entrega está com versão base `1.2.0`. Depois que `main` estiver no GitHub:
+O código desta entrega está com versão base `1.3.1`. Depois que `main` estiver no GitHub:
 
 ```powershell
-git tag v1.2.0
-git push origin v1.2.0
+git tag v1.3.1
+git push origin v1.3.1
 ```
 
 A tag dispara `.github/workflows/release.yml`.
@@ -60,26 +61,26 @@ O workflow:
 
 Faça suas alterações e aumente a versão. Você não precisa editar o `.csproj` toda vez se publicar pelo workflow, porque a versão da tag é enviada ao build.
 
-Exemplo para `1.2.1`:
+Exemplo para `1.3.2`:
 
 ```powershell
 git add .
-git commit -m "Atualização 1.2.1"
+git commit -m "Atualização 1.3.2"
 git push origin main
-git tag v1.2.1
-git push origin v1.2.1
+git tag v1.3.2
+git push origin v1.3.2
 ```
 
-Quem estiver usando `1.2.0` verá `1.2.1`, o instalador será baixado automaticamente (configuração padrão) e ficará pronto para instalação.
+Quem estiver usando `1.3.1` verá `1.3.2`, o instalador será baixado automaticamente (configuração padrão) e ficará pronto para instalação.
 
 ## Regra de versão
 
 Use tags no formato:
 
 ```text
-v1.2.0
-v1.2.1
-v1.2.0
+v1.3.1
+v1.3.2
+v1.4.0
 v2.0.0
 ```
 
@@ -87,11 +88,11 @@ Evite reutilizar a mesma tag para builds diferentes.
 
 ## Testar o atualizador
 
-1. Publique e instale `v1.2.0`.
+1. Publique e instale `v1.3.1`.
 2. Faça uma pequena mudança no código.
-3. Publique a tag `v1.2.1`.
-4. Abra a instalação `1.2.0`.
-5. O app deve encontrar `1.2.1` e baixar o instalador.
+3. Publique a tag `v1.3.2`.
+4. Abra a instalação `1.3.1`.
+5. O app deve encontrar `1.3.2` e baixar o instalador.
 6. Confira a tela **Configurações > Atualizações**.
 7. Clique em **Instalar agora** e aceite o UAC.
 8. Depois da instalação, confirme a versão exibida no menu/configurações.

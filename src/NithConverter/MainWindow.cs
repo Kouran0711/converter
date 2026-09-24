@@ -22,8 +22,8 @@ public sealed class MainWindow : Window
     {
         _initialFile = initialFile;
         Title = "NITH Converter";
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(1140, 860));
-        AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "Generated", "app.ico"));
+        AppWindow.Resize(new Windows.Graphics.SizeInt32(1360, 860));
+        AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "Brand", "NithConverter.ico"));
         var splash = _splash = new SplashView();
         _root.Children.Add(splash);
         Content = _root;

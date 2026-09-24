@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.1
+- Correção completa do aproveitamento de largura da interface em tela maximizada.
+- Painel de opções ampliado e componentes reorganizados para evitar cortes e elementos amontoados.
+- Nova identidade visual azul da Nith mantida com logo transparente.
+- Ícone do executável, janela, instalador e atalhos unificado na nova marca.
+- Atualizador refeito para usar manifesto da release antes da API do GitHub, reduzindo falhas e limites da API.
+- Mensagens de atualização não culpam mais a conexão do usuário quando o GitHub retorna erro temporário.
+- Instalador publicado com nome simples `NITH Converter.exe`.
+- Arquivos internos do runtime ficam ocultos na pasta de instalação padrão, deixando visível o executável principal.
+
+
 ## 1.3.0
 - Correção da tela de abertura após a reformulação visual: os elementos animados `LogoHolder` e `Orbit` voltaram a ser nomeados no XAML para corresponder ao code-behind.
 - Mantém a nova interface Nith, logo transparente e conversão de áudio.

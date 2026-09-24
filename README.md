@@ -26,15 +26,16 @@ Conversor de arquivos para Windows feito para transformar imagens, documentos, v
 
 ## Atualizações automáticas
 
-O aplicativo consulta a release pública mais recente de `Kouran0711/converter`. Quando encontra uma versão superior à instalada, ele pode baixar automaticamente o instalador `NITHConverter-Setup-x64-*.exe` e o arquivo `.sha256` correspondente.
+O aplicativo consulta a release pública mais recente de `Kouran0711/converter`. Quando encontra uma versão superior à instalada, ele pode baixar automaticamente o instalador `NITH Converter.exe`. As releases novas publicam também `nith-update.json`, usado como fonte principal da versão e do SHA-256; a API do GitHub fica como fallback para releases antigas.
 
 O instalador é validado antes de ficar disponível. Ao clicar em **Instalar agora**, o Windows mostra a confirmação de administrador (UAC), o Inno Setup atualiza os arquivos em `Program Files` e usa o Restart Manager para fechar/reabrir o aplicativo quando possível.
 
-O atualizador só reconhece releases que tenham **os dois arquivos**:
+As releases novas incluem um manifesto `nith-update.json` para tornar a verificação mais confiável. Por compatibilidade, o app também entende releases antigas com instalador + `.sha256`:
 
 ```text
-NITHConverter-Setup-x64-<versao>.exe
-NITHConverter-Setup-x64-<versao>.exe.sha256
+NITH Converter.exe
+NITH Converter.exe.sha256
+nith-update.json
 ```
 
 O workflow em `.github/workflows/release.yml` gera isso automaticamente quando uma tag `vX.Y.Z` é enviada ao GitHub.
@@ -65,7 +66,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Publish.ps1 -Install
 Publicar uma versão específica:
 
 ```powershell
-.\scripts\Publish.ps1 -Installer -Version 1.1.1
+.\scripts\Publish.ps1 -Installer -Version 1.3.1
 ```
 
 Saídas:
@@ -82,8 +83,8 @@ O instalador exige administrador por projeto (`PrivilegesRequired=admin`). O apl
 Depois de enviar o código para o GitHub, uma release pode ser criada apenas com uma tag:
 
 ```powershell
-git tag v1.1.1
-git push origin v1.1.1
+git tag v1.3.1
+git push origin v1.3.1
 ```
 
 O GitHub Actions compila no Windows, cria o instalador, pacote portátil e checksums SHA-256 e publica a GitHub Release automaticamente.
@@ -104,7 +105,7 @@ Arquivos de build (`bin`, `obj`, `artifacts`, `.tools`, assets gerados etc.) fic
 
 ## Privacidade
 
-As conversões são locais. Configurações, histórico limitado e logs ficam em `%LOCALAPPDATA%\NITH Converter`. A verificação de atualização acessa apenas a API pública do GitHub e os assets da release.
+As conversões são locais. Configurações, histórico limitado e logs ficam em `%LOCALAPPDATA%\NITH Converter`. A verificação de atualização acessa apenas endpoints públicos do GitHub Releases (manifesto/asset) e usa a API pública apenas como fallback de compatibilidade.
 
 ---
 

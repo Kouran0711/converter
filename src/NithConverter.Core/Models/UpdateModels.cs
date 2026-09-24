@@ -6,7 +6,8 @@ public sealed record UpdateRelease(
     string Title,
     string InstallerFileName,
     Uri InstallerUri,
-    Uri ChecksumUri,
+    Uri? ChecksumUri,
+    string? ExpectedSha256,
     long InstallerSize,
     Uri ReleasePageUri);
 

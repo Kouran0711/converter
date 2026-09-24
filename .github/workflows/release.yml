@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Versão da release (ex.: 1.2.0)'
+        description: 'Versão da release (ex.: 1.3.1)'
         required: true
-        default: '1.2.0'
+        default: '1.3.1'
         type: string
 
 permissions:
@@ -67,18 +67,19 @@ jobs:
         run: |
           .\scripts\Publish.ps1 -Installer -Version '${{ steps.version.outputs.version }}'
 
-      - name: Criar pacote portátil e checksums
+      - name: Criar pacote portátil, manifesto e checksums
         id: assets
         shell: pwsh
         run: |
           $version = '${{ steps.version.outputs.version }}'
-          $installer = Get-ChildItem .\artifacts\installer\NITHConverter-Setup-x64-*.exe |
+          $tag = '${{ steps.version.outputs.tag }}'
+          $installer = Get-ChildItem .\artifacts\installer\*.exe |
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1
 
           if (-not $installer) { throw 'Instalador não encontrado.' }
 
-          $portable = ".\artifacts\installer\NITHConverter-portable-win-x64-$version.zip"
+          $portable = Join-Path $installer.Directory.FullName 'NITH Converter Portable.zip'
           Compress-Archive -Path .\artifacts\publish\win-x64\* -DestinationPath $portable -Force
 
           function Get-Sha256Hex([string]$Path) {
@@ -94,14 +95,27 @@ jobs:
             }
           }
 
-          foreach ($file in @($installer.FullName, (Resolve-Path $portable).Path)) {
-            $hash = Get-Sha256Hex $file
-            "$hash  $([IO.Path]::GetFileName($file))" |
-              Set-Content -LiteralPath "$file.sha256" -Encoding ascii
-          }
+          $installerHash = Get-Sha256Hex $installer.FullName
+          $portableHash = Get-Sha256Hex $portable
+          "$installerHash  $($installer.Name)" |
+            Set-Content -LiteralPath "$($installer.FullName).sha256" -Encoding ascii
+          "$portableHash  $([IO.Path]::GetFileName($portable))" |
+            Set-Content -LiteralPath "$portable.sha256" -Encoding ascii
+
+          $manifestPath = Join-Path $installer.Directory.FullName 'nith-update.json'
+          $manifest = [ordered]@{
+            version = $version
+            tag = $tag
+            title = "NITH Converter $version"
+            installer = $installer.Name
+            sha256 = $installerHash
+            size = $installer.Length
+          } | ConvertTo-Json
+          [IO.File]::WriteAllText($manifestPath, $manifest, [Text.UTF8Encoding]::new($false))
 
           "installer=$($installer.FullName)" >> $env:GITHUB_OUTPUT
-          "portable=$((Resolve-Path $portable).Path)" >> $env:GITHUB_OUTPUT
+          "portable=$portable" >> $env:GITHUB_OUTPUT
+          "manifest=$manifestPath" >> $env:GITHUB_OUTPUT
 
       - name: Publicar ou atualizar GitHub Release
         shell: pwsh
@@ -111,12 +125,14 @@ jobs:
           $tag = '${{ steps.version.outputs.tag }}'
           $installer = '${{ steps.assets.outputs.installer }}'
           $portable = '${{ steps.assets.outputs.portable }}'
+          $manifest = '${{ steps.assets.outputs.manifest }}'
 
           $assets = @(
             $installer,
             "$installer.sha256",
             $portable,
-            "$portable.sha256"
+            "$portable.sha256",
+            $manifest
           )
 
           gh release view $tag *> $null
@@ -136,9 +152,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: NITHConverter-${{ steps.version.outputs.version }}
+          name: NITH-Converter-${{ steps.version.outputs.version }}
           if-no-files-found: warn
           path: |
             artifacts/installer/*.exe
             artifacts/installer/*.sha256
             artifacts/installer/*.zip
+            artifacts/installer/nith-update.json

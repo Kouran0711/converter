@@ -289,9 +289,15 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         catch (HttpRequestException ex)
         {
             UpdateStatus = "Não foi possível verificar atualizações";
-            UpdateDetail = "Confira a conexão com a internet e tente novamente nas Configurações.";
+            UpdateDetail = ex.StatusCode switch
+            {
+                System.Net.HttpStatusCode.Forbidden => "O GitHub recusou temporariamente a consulta. Sua internet pode estar normal; tente novamente em alguns minutos.",
+                System.Net.HttpStatusCode.TooManyRequests => "O GitHub limitou temporariamente as consultas. Tente novamente em alguns minutos.",
+                System.Net.HttpStatusCode.NotFound => "A fonte de atualização não foi encontrada no GitHub.",
+                _ => "O GitHub não respondeu corretamente. Tente novamente em alguns instantes; isso não significa necessariamente falha na sua internet."
+            };
             SetUpdateBanner(force, actionVisible: false);
-            await _logger.WriteAsync("update.check_failed", ex.GetType().Name);
+            await _logger.WriteAsync("update.check_failed", $"{ex.GetType().Name}; status={(int?)ex.StatusCode}; {ex.Message}");
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or System.Security.Cryptography.CryptographicException)
         {
@@ -327,10 +333,16 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         {
             _downloadedUpdate = null;
             UpdateStatus = "Não foi possível baixar a atualização";
-            UpdateDetail = ex is InvalidDataException ? ex.Message : "Confira sua conexão e tente novamente.";
+            UpdateDetail = ex switch
+            {
+                InvalidDataException => ex.Message,
+                HttpRequestException http when http.StatusCode == System.Net.HttpStatusCode.Forbidden => "O GitHub recusou temporariamente o download. Tente novamente em alguns minutos.",
+                HttpRequestException http when http.StatusCode == System.Net.HttpStatusCode.TooManyRequests => "O GitHub limitou temporariamente os downloads. Tente novamente em alguns minutos.",
+                _ => "O download não foi concluído. Tente novamente; sua conexão pode estar funcionando normalmente e o GitHub pode ter respondido com erro temporário."
+            };
             UpdateActionText = "Tentar novamente";
             SetUpdateBanner(true, actionVisible: true);
-            await _logger.WriteAsync("update.download_failed", ex.GetType().Name);
+            await _logger.WriteAsync("update.download_failed", $"{ex.GetType().Name}; {ex.Message}");
         }
     }
 
@@ -370,7 +382,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         DependencyStatus = "Verificando mecanismos…";
         var result = await _dependencies.DiscoverAsync(force, _lifetime.Token);
         ImageMagickStatus = result.ImageMagickPath is null ? "Não encontrado · necessário para imagens" : "Disponível · imagens e criação de PDF";
-        FFmpegStatus = result.FFmpegPath is null ? "Não encontrado · necessário para vídeos" : result.FFprobePath is null ? "Disponível · progresso indeterminado (ffprobe ausente)" : "Disponível · vídeos e progresso real";
+        FFmpegStatus = result.FFmpegPath is null ? "Não encontrado · necessário para vídeos e áudio" : result.FFprobePath is null ? "Disponível · áudio/vídeo com progresso indeterminado (ffprobe ausente)" : "Disponível · áudio, vídeo e progresso real";
         PdfStatus = result.GhostscriptPath is null ? "Ghostscript ausente · PDF/PS/EPS indisponíveis" : "Ghostscript disponível · leitura de PDF/PS/EPS";
         DependencyStatus = result.ImageMagickPath is not null && result.FFmpegPath is not null ? "Mecanismos disponíveis" : "Verifique os mecanismos nas configurações";
         await _logger.WriteAsync("dependencies", $"imagemagick={result.ImageMagickPath is not null}; ffmpeg={result.FFmpegPath is not null}; ffprobe={result.FFprobePath is not null}");

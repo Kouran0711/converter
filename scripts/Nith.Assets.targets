@@ -1,9 +1,13 @@
 <Project>
   <PropertyGroup>
     <NithRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\'))</NithRepositoryRoot>
-    <ApplicationIcon>Assets\Generated\app.ico</ApplicationIcon>
+    <ApplicationIcon>Assets\Brand\NithConverter.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="Assets\Brand\NithConverter.ico;Assets\Brand\NithConverter.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
     <Content Include="Assets\Generated\logo-16.png;Assets\Generated\logo-20.png;Assets\Generated\logo-24.png;Assets\Generated\logo-32.png;Assets\Generated\logo-40.png;Assets\Generated\logo-48.png;Assets\Generated\logo-64.png;Assets\Generated\logo-128.png;Assets\Generated\logo-256.png;Assets\Generated\logo-512.png;Assets\Generated\app.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>

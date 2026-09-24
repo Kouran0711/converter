@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [ValidateSet('Release', 'Debug')][string]$Configuration = 'Release',
     [switch]$BundleDependencies,
@@ -101,7 +101,7 @@ if ($Installer) {
     if ([string]::IsNullOrWhiteSpace($IsccPath) -or -not (Test-Path -LiteralPath $IsccPath)) {
         throw 'Aplicativo publicado. Para gerar o instalador, instale Inno Setup 6.3+ e informe -IsccPath se necessário.'
     }
-    $version = [Diagnostics.FileVersionInfo]::GetVersionInfo($executable).FileVersion
-    & $IsccPath "/DAppVersion=$version" "/DPublishDir=$publishDirectory" (Join-Path $projectRoot 'Installer\NithConverter.iss')
+    $installerVersion = if (-not [string]::IsNullOrWhiteSpace($Version)) { $Version } else { [Diagnostics.FileVersionInfo]::GetVersionInfo($executable).FileVersion }
+    & $IsccPath "/DAppVersion=$installerVersion" "/DPublishDir=$publishDirectory" (Join-Path $projectRoot 'Installer\NithConverter.iss')
     if ($LASTEXITCODE -ne 0) { throw "ISCC falhou (código $LASTEXITCODE)." }
 }
