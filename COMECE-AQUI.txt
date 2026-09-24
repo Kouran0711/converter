@@ -1,0 +1,29 @@
+NITH CONVERTER - COMEÇE AQUI
+============================
+
+1) Envie TODO o conteúdo desta pasta para a raiz do repositório:
+   https://github.com/Kouran0711/converter
+
+2) Confirme que existe no GitHub:
+   .github/workflows/release.yml
+
+3) Para criar a versão 1.1.0 SEM usar terminal:
+   GitHub > Actions > Build e publicar release > Run workflow
+   Version: 1.1.0
+   Clique em Run workflow.
+
+4) O workflow vai:
+   - instalar o SDK .NET do global.json;
+   - compilar o app;
+   - gerar o instalador com Inno Setup;
+   - gerar o ZIP portátil;
+   - criar SHA-256;
+   - criar/atualizar a Release v1.1.0.
+
+5) Depois abra GitHub > Releases e baixe:
+   NITHConverter-Setup-x64-1.1.0.0.exe
+
+6) Nas próximas versões use 1.1.1, 1.1.2, 1.2.0 etc.
+
+Assinatura do projeto:
+Nith Digital - nithdigital.com.br

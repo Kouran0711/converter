@@ -5,6 +5,12 @@ on:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versão da release (ex.: 1.1.0)'
+        required: true
+        default: '1.1.0'
+        type: string
 
 permissions:
   contents: write
@@ -16,11 +22,19 @@ jobs:
     steps:
       - name: Baixar código
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-      - name: Configurar .NET 10
+      - name: Configurar .NET
         uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+
+      - name: Mostrar ambiente
+        shell: pwsh
+        run: |
+          dotnet --info
+          git --version
 
       - name: Instalar Inno Setup
         shell: pwsh
@@ -30,14 +44,23 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { 'v1.1.0-ci' }
-          $version = $tag.TrimStart('v')
-          if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') {
-            if ($env:GITHUB_REF_TYPE -eq 'tag') { throw "Tag inválida: $tag. Use v1.2.3" }
-            $version = '1.1.0'
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $tag = $env:GITHUB_REF_NAME
+            $version = $tag.TrimStart('v')
           }
+          else {
+            $version = '${{ inputs.version }}'.Trim()
+            $tag = "v$version"
+          }
+
+          if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') {
+            throw "Versão inválida: $version. Use 1.2.3 ou 1.2.3.4."
+          }
+
           "tag=$tag" >> $env:GITHUB_OUTPUT
           "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Versão: $version"
+          Write-Host "Tag: $tag"
 
       - name: Publicar aplicativo e instalador
         shell: pwsh
@@ -49,35 +72,59 @@ jobs:
         shell: pwsh
         run: |
           $version = '${{ steps.version.outputs.version }}'
-          $installer = Get-ChildItem .\artifacts\installer\NITHConverter-Setup-x64-*.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          $installer = Get-ChildItem .\artifacts\installer\NITHConverter-Setup-x64-*.exe |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
           if (-not $installer) { throw 'Instalador não encontrado.' }
+
           $portable = ".\artifacts\installer\NITHConverter-portable-win-x64-$version.zip"
           Compress-Archive -Path .\artifacts\publish\win-x64\* -DestinationPath $portable -Force
+
           foreach ($file in @($installer.FullName, (Resolve-Path $portable).Path)) {
-            $hash = (Get-Sha256Hex -Path $file)
-            "$hash  $([IO.Path]::GetFileName($file))" | Set-Content -LiteralPath "$file.sha256" -Encoding ascii
+            $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $([IO.Path]::GetFileName($file))" |
+              Set-Content -LiteralPath "$file.sha256" -Encoding ascii
           }
+
           "installer=$($installer.FullName)" >> $env:GITHUB_OUTPUT
           "portable=$((Resolve-Path $portable).Path)" >> $env:GITHUB_OUTPUT
 
-      - name: Publicar GitHub Release
-        if: github.ref_type == 'tag'
+      - name: Publicar ou atualizar GitHub Release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $tag = '${{ steps.version.outputs.tag }}'
           $installer = '${{ steps.assets.outputs.installer }}'
           $portable = '${{ steps.assets.outputs.portable }}'
-          gh release create '${{ steps.version.outputs.tag }}' `
-            "$installer" "$installer.sha256" "$portable" "$portable.sha256" `
-            --title "NITH Converter ${{ steps.version.outputs.tag }}" `
-            --generate-notes
 
-      - name: Guardar artefatos do build manual
-        if: github.ref_type != 'tag'
+          $assets = @(
+            $installer,
+            "$installer.sha256",
+            $portable,
+            "$portable.sha256"
+          )
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release $tag já existe. Atualizando arquivos..."
+            gh release upload $tag @assets --clobber
+          }
+          else {
+            Write-Host "Criando release $tag..."
+            gh release create $tag @assets `
+              --target $env:GITHUB_SHA `
+              --title "NITH Converter $tag" `
+              --generate-notes
+          }
+
+      - name: Guardar artefatos do build
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: NITHConverter-${{ steps.version.outputs.version }}
+          if-no-files-found: warn
           path: |
             artifacts/installer/*.exe
             artifacts/installer/*.sha256
