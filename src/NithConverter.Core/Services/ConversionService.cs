@@ -61,12 +61,12 @@ public sealed class ConversionService(DependencyService dependencies, HistorySer
 
             DependencySnapshot installed = await dependencies.DiscoverAsync(cancellationToken: token).ConfigureAwait(false);
             if ((kind is MediaKind.Video or MediaKind.Audio) && installed.FFmpegPath is null)
-                return Failure(ConversionError.DependencyMissing, "O FFmpeg não foi encontrado. Verifique as dependências nas configurações.");
+                return Failure(ConversionError.DependencyMissing, "O FFmpeg interno não foi encontrado. Reinstale o NITH Converter para restaurar os componentes de conversão.");
             if ((kind is MediaKind.Image or MediaKind.Document) && installed.ImageMagickPath is null)
-                return Failure(ConversionError.DependencyMissing, "O ImageMagick não foi encontrado. Verifique as dependências nas configurações.");
+                return Failure(ConversionError.DependencyMissing, "O ImageMagick interno não foi encontrado. Reinstale o NITH Converter para restaurar os componentes de conversão.");
             if (kind == MediaKind.Document && installed.GhostscriptPath is null)
                 return Failure(ConversionError.DependencyMissing,
-                    "A leitura de PDF precisa do Ghostscript. Instale-o separadamente e verifique as dependências nas configurações.");
+                    "O componente interno de documentos não foi encontrado. Reinstale o NITH Converter para restaurar o Ghostscript.");
 
             // Keep the source read-only and prevent writers/deletion while the child uses its path.
             await using var sourceGuard = new FileStream(input, FileMode.Open, FileAccess.Read, FileShare.Read,

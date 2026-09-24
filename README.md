@@ -22,7 +22,16 @@ Conversor de arquivos para Windows feito para transformar imagens, documentos, v
 - Verificação de atualização pelo GitHub Releases.
 - Download automático do instalador de atualização, com verificação SHA-256 quando a release fornece hash/digest.
 
-> A disponibilidade real de alguns formatos depende da compilação do ImageMagick, FFmpeg, Ghostscript e dos codecs/delegates instalados no computador.
+> O instalador oficial gerado por este repositório já leva os mecanismos nativos necessários. A disponibilidade de formatos muito específicos ainda depende dos codecs/delegates presentes nos builds embarcados.
+
+
+## Dependências incluídas no instalador
+
+Ao gerar um instalador ou uma release, `scripts/Prepare-Dependencies.ps1` baixa, confere e prepara automaticamente os mecanismos nativos usados pelo NITH Converter. O usuário final não precisa clicar em links nem instalar ImageMagick, FFmpeg ou Ghostscript manualmente.
+
+O pacote atual incorpora ImageMagick, FFmpeg/ffprobe e Ghostscript dentro da pasta privada do aplicativo. O Microsoft Visual C++ Redistributable x64 é levado pelo setup e executado silenciosamente antes do primeiro uso. `scripts/Test-DependencyBundle.ps1` confere hashes e inicia cada mecanismo no runner Windows; se algo essencial estiver ausente ou não iniciar, a release falha em vez de publicar um instalador incompleto.
+
+As versões/fontes ficam centralizadas em `scripts/Prepare-Dependencies.ps1` e no `bundle-manifest.json` gerado. Dependências futuras devem ser adicionadas a esse pipeline para manter o mesmo comportamento automático.
 
 ## Atualizações automáticas
 
@@ -52,6 +61,7 @@ Requisitos recomendados:
 - .NET 10 SDK (o `global.json` define a linha usada pelo projeto)
 - Visual Studio Build Tools/Visual Studio com ferramentas Windows/WinUI
 - Inno Setup 6.3+ para gerar o instalador
+- Internet durante o **build** para baixar e validar os runtimes oficiais/selecionados de ImageMagick, FFmpeg, Ghostscript e VC++ Runtime
 
 Publicar somente o aplicativo:
 
@@ -68,7 +78,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Publish.ps1 -Install
 Publicar uma versão específica:
 
 ```powershell
-.\scripts\Publish.ps1 -Installer -Version 1.5.3
+.\scripts\Publish.ps1 -Installer -Version 1.6.2
 ```
 
 Saídas:
@@ -85,8 +95,8 @@ O instalador exige administrador por projeto (`PrivilegesRequired=admin`). O apl
 Depois de enviar o código para o GitHub, uma release pode ser criada apenas com uma tag:
 
 ```powershell
-git tag v1.5.3
-git push origin v1.5.3
+git tag v1.6.2
+git push origin v1.6.2
 ```
 
 O GitHub Actions compila no Windows, cria o instalador, pacote portátil e checksums SHA-256 e publica a GitHub Release automaticamente.

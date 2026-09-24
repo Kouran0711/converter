@@ -348,7 +348,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 InvalidDataException => ex.Message,
                 HttpRequestException http when http.StatusCode == System.Net.HttpStatusCode.Forbidden => "O GitHub recusou temporariamente o download. Tente novamente em alguns minutos.",
                 HttpRequestException http when http.StatusCode == System.Net.HttpStatusCode.TooManyRequests => "O GitHub limitou temporariamente os downloads. Tente novamente em alguns minutos.",
-                _ => "O download não foi concluído. Tente novamente; sua conexão pode estar funcionando normalmente e o GitHub pode ter respondido com erro temporário."
+                _ => ex.Message
             };
             UpdateActionText = "Tentar novamente";
             SetUpdateBanner(true, actionVisible: true);
@@ -394,10 +394,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         DependencyStatus = "Verificando mecanismos…";
         var result = await _dependencies.DiscoverAsync(force, _lifetime.Token);
-        ImageMagickStatus = result.ImageMagickPath is null ? "Não encontrado · necessário para imagens" : "Disponível · imagens e criação de PDF";
-        FFmpegStatus = result.FFmpegPath is null ? "Não encontrado · necessário para vídeos e áudio" : result.FFprobePath is null ? "Disponível · áudio/vídeo com progresso indeterminado (ffprobe ausente)" : "Disponível · áudio, vídeo e progresso real";
-        PdfStatus = result.GhostscriptPath is null ? "Ghostscript ausente · PDF/PS/EPS indisponíveis" : "Ghostscript disponível · leitura de PDF/PS/EPS";
-        DependencyStatus = result.ImageMagickPath is not null && result.FFmpegPath is not null ? "Mecanismos disponíveis" : "Verifique os mecanismos nas configurações";
+        ImageMagickStatus = result.ImageMagickPath is null ? "Não instalado" : "Instalado · pronto";
+        FFmpegStatus = result.FFmpegPath is null ? "Não instalado" : result.FFprobePath is null ? "Instalação incompleta · ffprobe ausente" : "Instalado · pronto";
+        PdfStatus = result.GhostscriptPath is null ? "Não instalado" : "Instalado · pronto";
+        DependencyStatus = result.ImageMagickPath is not null && result.FFmpegPath is not null && result.FFprobePath is not null && result.GhostscriptPath is not null
+            ? "Todos os mecanismos de conversão estão instalados e prontos."
+            : "Instalação incompleta. Reinstale o NITH Converter para restaurar os componentes internos.";
         await _logger.WriteAsync("dependencies", $"imagemagick={result.ImageMagickPath is not null}; ffmpeg={result.FFmpegPath is not null}; ffprobe={result.FFprobePath is not null}");
     }
     private async Task RefreshHistoryAsync()

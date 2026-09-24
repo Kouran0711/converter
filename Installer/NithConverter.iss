@@ -1,6 +1,6 @@
 ﻿; Build with scripts/Publish.ps1 -Installer, using Inno Setup 6.3 or later.
 #ifndef AppVersion
-  #define AppVersion "1.5.3"
+  #define AppVersion "1.6.2"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\publish\win-x64"
@@ -11,6 +11,7 @@
 #define AppUpdatesURL "https://github.com/Kouran0711/converter/releases"
 #define AppExeName "NITHConverter.exe"
 #define BrandIcon "NITH Converter " + AppVersion + ".ico"
+#define DependenciesDir "Dependencies"
 
 [Setup]
 AppId={{5A22F590-A9F0-4B54-A732-F1E83C00A277}
@@ -52,12 +53,14 @@ Name: "desktopicon"; Description: "Criar um atalho na área de trabalho"; GroupD
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#PublishDir}\Assets\Brand\NithConverter.ico"; DestDir: "{app}"; DestName: "{#BrandIcon}"; Flags: ignoreversion
+Source: "{#DependenciesDir}\prerequisites\VC_redist.x64.exe"; DestDir: "{tmp}"; DestName: "VC_redist.x64.exe"; Flags: deleteafterinstall
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#BrandIcon}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#BrandIcon}"; Tasks: desktopicon
 
 [Run]
+Filename: "{tmp}\VC_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Preparando componentes nativos do Windows..."; Flags: waituntilterminated runhidden
 ; Corrige instalações anteriores que ocultavam a pasta inteira. Primeiro restaura a visibilidade
 ; de todos os arquivos e diretórios; depois oculta SOMENTE o lixo técnico no diretório raiz.
 ; Pastas, desinstalador, executável principal e arquivos de suporte importantes permanecem visíveis.

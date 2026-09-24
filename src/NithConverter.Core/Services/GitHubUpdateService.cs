@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -26,6 +27,7 @@ public sealed class GitHubUpdateService
     private readonly string _owner;
     private readonly string _repository;
     private readonly HttpClient _http;
+    private readonly HttpClient _downloadHttp;
 
     public Version? LastKnownLatestVersion { get; private set; }
     public string LastCheckSource { get; private set; } = "";
@@ -35,23 +37,33 @@ public sealed class GitHubUpdateService
         _owner = owner;
         _repository = repository;
         _http = httpClient ?? CreateHttpClient();
+        _downloadHttp = httpClient ?? CreateDownloadHttpClient();
 
         if (!_http.DefaultRequestHeaders.UserAgent.Any())
             _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("NITHConverter", "1.0"));
+        if (!_downloadHttp.DefaultRequestHeaders.UserAgent.Any())
+            _downloadHttp.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("NITHConverter-Updater", "1.6"));
     }
 
-    private static HttpClient CreateHttpClient()
+    private static HttpClient CreateHttpClient() => CreateHttpClientCore(TimeSpan.FromSeconds(30));
+
+    private static HttpClient CreateDownloadHttpClient() => CreateHttpClientCore(TimeSpan.FromMinutes(30));
+
+    private static HttpClient CreateHttpClientCore(TimeSpan timeout)
     {
         var handler = new HttpClientHandler
         {
             AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,
             AllowAutoRedirect = true,
-            MaxAutomaticRedirections = 8
+            MaxAutomaticRedirections = 12,
+            UseProxy = true,
+            DefaultProxyCredentials = CredentialCache.DefaultCredentials
         };
         return new HttpClient(handler)
         {
-            Timeout = TimeSpan.FromSeconds(25),
-            DefaultRequestVersion = HttpVersion.Version20,
+            Timeout = timeout,
+            // GitHub's release CDN works reliably with HTTP/1.1 even on machines/proxies where HTTP/2 is filtered.
+            DefaultRequestVersion = HttpVersion.Version11,
             DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower
         };
     }
@@ -62,58 +74,68 @@ public sealed class GitHubUpdateService
         LastKnownLatestVersion = null;
         LastCheckSource = "";
 
+        // Caminho principal: um arquivo pequeno e versionado publicado em toda release pelo nosso workflow.
+        // Isso evita depender do limite público da API do GitHub só para descobrir a versão.
+        Exception? manifestFailure = null;
+        try
+        {
+            UpdateManifest? manifest = await TryReadManifestAsync(BuildLatestAssetUri(ManifestAssetName), cancellationToken).ConfigureAwait(false);
+            if (manifest is not null)
+            {
+                LastCheckSource = "Manifesto da release estável";
+                LastKnownLatestVersion = manifest.Version;
+                if (manifest.Version <= current) return null;
+
+                return new UpdateRelease(
+                    manifest.Version,
+                    manifest.Tag,
+                    manifest.Title,
+                    manifest.InstallerFileName,
+                    BuildAssetUri(manifest.Tag, manifest.InstallerFileName),
+                    null,
+                    manifest.Sha256,
+                    manifest.Size,
+                    new Uri($"https://github.com/{Escape(_owner)}/{Escape(_repository)}/releases/tag/{Escape(manifest.Tag)}"));
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception ex) when (IsRecoverableCheckFailure(ex)) { manifestFailure = ex; }
+
+        // Compatibilidade com releases antigas ou manifesto ausente: consulta a API pública.
         Exception? apiFailure = null;
         try
         {
             ApiRelease? candidate = await GetHighestStableReleaseFromApiAsync(cancellationToken).ConfigureAwait(false);
-            LastCheckSource = "GitHub Releases";
+            LastCheckSource = "GitHub Releases API";
             LastKnownLatestVersion = candidate?.Version;
-
-            if (candidate is null || candidate.Version <= current)
-                return null;
-
+            if (candidate is null || candidate.Version <= current) return null;
             return await BuildReleaseFromApiAsync(candidate, cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex) when (IsRecoverableCheckFailure(ex))
-        {
-            apiFailure = ex;
-        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception ex) when (IsRecoverableCheckFailure(ex)) { apiFailure = ex; }
 
-        // Fallback sem API: segue /releases/latest, lê a tag final e tenta manifesto/nomes conhecidos.
-        // Se ele disser que não há versão nova, NÃO declaramos "atualizado" porque a consulta completa falhou.
+        // Último fallback: segue /releases/latest e tenta localizar os assets pelo nome conhecido.
         try
         {
             UpdateRelease? fallback = await TryGetLatestReleaseWithoutApiAsync(cancellationToken).ConfigureAwait(false);
             LastCheckSource = "GitHub Latest (fallback)";
             LastKnownLatestVersion = fallback?.Version;
+            if (fallback is not null && fallback.Version > current) return fallback;
+            if (fallback is not null && fallback.Version <= current) return null;
 
-            if (fallback is not null && fallback.Version > current)
-                return fallback;
-
-            string observed = fallback is null ? "nenhuma versão identificável" : FormatVersion(fallback.Version);
-            throw new HttpRequestException(
-                $"O GitHub informou {observed} pelo fallback, mas a lista completa de releases não pôde ser consultada. " +
-                "Por segurança o aplicativo não vai afirmar que está atualizado até conseguir confirmar a lista de releases.",
-                apiFailure);
+            throw new HttpRequestException("O GitHub respondeu, mas não foi possível identificar uma release estável válida.");
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception fallbackFailure) when (IsRecoverableCheckFailure(fallbackFailure))
         {
-            if (fallbackFailure is HttpRequestException http && http.InnerException == apiFailure)
-                throw;
-
-            HttpStatusCode? status = (apiFailure as HttpRequestException)?.StatusCode ??
+            HttpStatusCode? status = (manifestFailure as HttpRequestException)?.StatusCode ??
+                                     (apiFailure as HttpRequestException)?.StatusCode ??
                                      (fallbackFailure as HttpRequestException)?.StatusCode;
+            string details = string.Join(" | ", new[] { manifestFailure?.Message, apiFailure?.Message, fallbackFailure.Message }
+                .Where(value => !string.IsNullOrWhiteSpace(value)).Take(3));
             throw new HttpRequestException(
-                "Não foi possível confirmar a versão mais recente no GitHub. A consulta pela API e o fallback público falharam.",
-                new AggregateException(apiFailure ?? fallbackFailure, fallbackFailure),
+                $"Não foi possível confirmar a versão mais recente no GitHub. {details}",
+                new AggregateException(new Exception?[] { manifestFailure, apiFailure, fallbackFailure }.OfType<Exception>()),
                 status);
         }
     }
@@ -275,16 +297,13 @@ public sealed class GitHubUpdateService
 
         if (File.Exists(installerPath))
         {
-            if (expectedHash is not null)
+            try
             {
-                string cachedHash = await ComputeSha256Async(installerPath, cancellationToken).ConfigureAwait(false);
-                if (cachedHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
-                {
-                    progress?.Report(100);
-                    return new DownloadedUpdate(release, installerPath, IntegrityVerified: true);
-                }
+                await ValidateDownloadedInstallerAsync(installerPath, expectedHash, cancellationToken).ConfigureAwait(false);
+                progress?.Report(100);
+                return new DownloadedUpdate(release, installerPath, IntegrityVerified: expectedHash is not null);
             }
-            TryDelete(installerPath);
+            catch (InvalidDataException) { TryDelete(installerPath); }
         }
 
         foreach (string old in Directory.EnumerateFiles(updatesDirectory, "*.exe*"))
@@ -293,43 +312,214 @@ public sealed class GitHubUpdateService
             TryDelete(old);
         }
 
+        var candidates = new List<Uri> { release.InstallerUri };
+        Uri canonical = BuildAssetUri(release.Tag, release.InstallerFileName);
+        Uri latest = BuildLatestAssetUri(release.InstallerFileName);
+        if (!candidates.Any(uri => uri.AbsoluteUri.Equals(canonical.AbsoluteUri, StringComparison.OrdinalIgnoreCase))) candidates.Add(canonical);
+        if (!candidates.Any(uri => uri.AbsoluteUri.Equals(latest.AbsoluteUri, StringComparison.OrdinalIgnoreCase))) candidates.Add(latest);
+
+        var failures = new List<string>();
+        foreach (Uri candidate in candidates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            TryDelete(temporaryPath);
+            try
+            {
+                await DownloadWithHttpClientAsync(candidate, temporaryPath, release.InstallerSize, progress, cancellationToken).ConfigureAwait(false);
+                await ValidateDownloadedInstallerAsync(temporaryPath, expectedHash, cancellationToken).ConfigureAwait(false);
+                File.Move(temporaryPath, installerPath, overwrite: true);
+                progress?.Report(100);
+                return new DownloadedUpdate(release, installerPath, IntegrityVerified: expectedHash is not null);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or TaskCanceledException)
+            {
+                failures.Add($"HTTP {candidate.Host}: {ex.Message}");
+                TryDelete(temporaryPath);
+            }
+        }
+
+        // BITS é o mecanismo nativo do Windows para transferências grandes e tolera melhor
+        // conexões instáveis/proxies corporativos. Se o serviço estiver desativado, seguimos para curl.
+        foreach (Uri candidate in candidates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            TryDelete(temporaryPath);
+            try
+            {
+                progress?.Report(5);
+                await DownloadWithBitsAsync(candidate, temporaryPath, cancellationToken).ConfigureAwait(false);
+                progress?.Report(95);
+                await ValidateDownloadedInstallerAsync(temporaryPath, expectedHash, cancellationToken).ConfigureAwait(false);
+                File.Move(temporaryPath, installerPath, overwrite: true);
+                progress?.Report(100);
+                return new DownloadedUpdate(release, installerPath, IntegrityVerified: expectedHash is not null);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or TaskCanceledException or System.ComponentModel.Win32Exception)
+            {
+                failures.Add($"BITS {candidate.Host}: {ex.Message}");
+                TryDelete(temporaryPath);
+            }
+        }
+
+        // Windows 10/11 traz curl.exe. Ele oferece uma terceira rota quando HttpClient/BITS
+        // são bloqueados ou alterados por proxy, antivírus ou filtro de rede.
+        foreach (Uri candidate in candidates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            TryDelete(temporaryPath);
+            try
+            {
+                progress?.Report(5);
+                await DownloadWithCurlAsync(candidate, temporaryPath, cancellationToken).ConfigureAwait(false);
+                progress?.Report(95);
+                await ValidateDownloadedInstallerAsync(temporaryPath, expectedHash, cancellationToken).ConfigureAwait(false);
+                File.Move(temporaryPath, installerPath, overwrite: true);
+                progress?.Report(100);
+                return new DownloadedUpdate(release, installerPath, IntegrityVerified: expectedHash is not null);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or TaskCanceledException or System.ComponentModel.Win32Exception)
+            {
+                failures.Add($"curl {candidate.Host}: {ex.Message}");
+                TryDelete(temporaryPath);
+            }
+        }
+
+        string detail = failures.Count == 0 ? "nenhuma rota de download ficou disponível" : string.Join(" | ", failures.Take(6));
+        throw new HttpRequestException($"Não foi possível baixar o instalador da atualização após tentar as rotas do GitHub. {detail}");
+    }
+
+    private async Task DownloadWithHttpClientAsync(Uri uri, string destination, long expectedSize,
+        IProgress<double>? progress, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true };
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/octet-stream"));
+        using HttpResponseMessage response = await _downloadHttp.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            throw new HttpRequestException("O instalador não existe nessa release.", null, response.StatusCode);
+        response.EnsureSuccessStatusCode();
+
+        string? mediaType = response.Content.Headers.ContentType?.MediaType;
+        if (mediaType is not null && mediaType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("O GitHub retornou uma página HTML no lugar do instalador.");
+
+        long? total = response.Content.Headers.ContentLength ?? (expectedSize > 0 ? expectedSize : null);
+        await using Stream input = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        await using FileStream output = new(destination, FileMode.Create, FileAccess.Write, FileShare.None,
+            256 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
+        byte[] buffer = new byte[256 * 1024];
+        long received = 0;
+        int read;
+        while ((read = await input.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+        {
+            await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+            received += read;
+            if (total is > 0) progress?.Report(Math.Clamp(received * 100d / total.Value, 0, 99));
+        }
+        await output.FlushAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task DownloadWithBitsAsync(Uri uri, string destination, CancellationToken cancellationToken)
+    {
+        string windowsPowerShell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),
+            @"WindowsPowerShell\v1.0\powershell.exe");
+        string executable = File.Exists(windowsPowerShell) ? windowsPowerShell : "powershell.exe";
+        var startInfo = new ProcessStartInfo(executable)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        startInfo.Environment["NITH_UPDATE_URL"] = uri.AbsoluteUri;
+        startInfo.Environment["NITH_UPDATE_DEST"] = destination;
+        foreach (string argument in new[]
+        {
+            "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command",
+            "$ErrorActionPreference='Stop'; Import-Module BitsTransfer -ErrorAction Stop; " +
+            "Start-BitsTransfer -Source $env:NITH_UPDATE_URL -Destination $env:NITH_UPDATE_DEST " +
+            "-TransferType Download -Priority Foreground -ErrorAction Stop"
+        }) startInfo.ArgumentList.Add(argument);
+
+        using var process = new Process { StartInfo = startInfo };
+        if (!process.Start()) throw new IOException("Não foi possível iniciar o BITS para baixar a atualização.");
+        Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         try
         {
-            using HttpResponseMessage response = await GetAsync(release.InstallerUri, cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
-            long? total = response.Content.Headers.ContentLength ?? (release.InstallerSize > 0 ? release.InstallerSize : null);
-            await using Stream input = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            await using FileStream output = new(temporaryPath, FileMode.Create, FileAccess.Write, FileShare.None,
-                128 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
-
-            byte[] buffer = new byte[128 * 1024];
-            long received = 0;
-            int read;
-            while ((read = await input.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
-            {
-                await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
-                received += read;
-                if (total is > 0) progress?.Report(Math.Clamp(received * 100d / total.Value, 0, 100));
-            }
-            await output.FlushAsync(cancellationToken).ConfigureAwait(false);
-
-            bool verified = false;
-            if (expectedHash is not null)
-            {
-                string actualHash = await ComputeSha256Async(temporaryPath, cancellationToken).ConfigureAwait(false);
-                if (!actualHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidDataException("A verificação SHA-256 da atualização falhou. O instalador foi descartado.");
-                verified = true;
-            }
-
-            File.Move(temporaryPath, installerPath, overwrite: true);
-            progress?.Report(100);
-            return new DownloadedUpdate(release, installerPath, verified);
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch
+        catch (OperationCanceledException)
         {
-            TryDelete(temporaryPath);
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
             throw;
+        }
+        string stderr = await stderrTask.ConfigureAwait(false);
+        _ = await stdoutTask.ConfigureAwait(false);
+        if (process.ExitCode != 0)
+            throw new HttpRequestException($"BITS retornou código {process.ExitCode}: {stderr.Trim()}");
+    }
+
+    private static async Task DownloadWithCurlAsync(Uri uri, string destination, CancellationToken cancellationToken)
+    {
+        string systemCurl = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "curl.exe");
+        string executable = File.Exists(systemCurl) ? systemCurl : "curl.exe";
+        var startInfo = new ProcessStartInfo(executable)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        foreach (string argument in new[]
+        {
+            "--fail", "--location", "--silent", "--show-error",
+            "--retry", "4", "--retry-delay", "2", "--retry-all-errors",
+            "--connect-timeout", "20", "--max-time", "1800",
+            "--user-agent", "NITHConverter-Updater/1.6",
+            "--output", destination, uri.AbsoluteUri
+        }) startInfo.ArgumentList.Add(argument);
+
+        using var process = new Process { StartInfo = startInfo };
+        if (!process.Start()) throw new IOException("Não foi possível iniciar o fallback de download do Windows.");
+        Task<string> stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
+            throw;
+        }
+        string stderr = await stderrTask.ConfigureAwait(false);
+        _ = await stdoutTask.ConfigureAwait(false);
+        if (process.ExitCode != 0)
+            throw new HttpRequestException($"curl retornou código {process.ExitCode}: {stderr.Trim()}");
+    }
+
+    private static async Task ValidateDownloadedInstallerAsync(string path, string? expectedHash, CancellationToken cancellationToken)
+    {
+        var info = new FileInfo(path);
+        if (!info.Exists || info.Length < 64 * 1024)
+            throw new InvalidDataException("O arquivo baixado é pequeno demais para ser o instalador do NITH Converter.");
+        await using (FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+                         4096, FileOptions.Asynchronous | FileOptions.SequentialScan))
+        {
+            byte[] header = new byte[2];
+            int count = await stream.ReadAsync(header, cancellationToken).ConfigureAwait(false);
+            if (count != 2 || header[0] != (byte)'M' || header[1] != (byte)'Z')
+                throw new InvalidDataException("O download concluído não é um executável Windows válido.");
+        }
+        if (expectedHash is not null)
+        {
+            string actualHash = await ComputeSha256Async(path, cancellationToken).ConfigureAwait(false);
+            if (!actualHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("A verificação SHA-256 da atualização falhou. O instalador foi descartado.");
         }
     }
 
@@ -437,6 +627,9 @@ public sealed class GitHubUpdateService
 
     private Uri BuildAssetUri(string tag, string assetName) => new(
         $"https://github.com/{Escape(_owner)}/{Escape(_repository)}/releases/download/{Escape(tag)}/{Escape(assetName)}");
+
+    private Uri BuildLatestAssetUri(string assetName) => new(
+        $"https://github.com/{Escape(_owner)}/{Escape(_repository)}/releases/latest/download/{Escape(assetName)}");
 
     private static string? ExtractTagFromReleaseUri(Uri uri)
     {

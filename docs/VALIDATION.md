@@ -1,70 +1,44 @@
-# Checklist de validação
-
-Este arquivo é um roteiro de teste para cada release. Resultados antigos e artefatos locais não são mantidos no repositório Git.
+# Validação antes da release
 
 ## Build
 
-```powershell
-dotnet --version
-.\scripts\Publish.ps1 -Installer
-```
+- Compilar/publishar `win-x64` em Release.
+- Confirmar que a versão gravada em `NITHConverter.exe` corresponde à versão solicitada.
+- Gerar os assets visuais sem erro.
 
-Confirme que existem:
+## Dependências embarcadas
+
+O workflow deve executar `Prepare-Dependencies.ps1` e `Test-DependencyBundle.ps1` automaticamente para releases com instalador.
+
+Confirmar no publish final:
 
 ```text
-artifacts/publish/win-x64/NITHConverter.exe
-artifacts/installer/NITH.Converter.exe
-artifacts/installer/NITH.Converter.exe.sha256
-artifacts/installer/nith-update.json
+bin/ImageMagick/magick.exe
+bin/FFmpeg/ffmpeg.exe
+bin/FFmpeg/ffprobe.exe
+bin/Ghostscript/bin/gswin64c.exe
+bundle-manifest.json
 ```
 
-## Interface
+O setup também deve conter `VC_redist.x64.exe` como pré-requisito temporário. O teste do bundle confere hashes e deve iniciar ImageMagick, FFmpeg, ffprobe e Ghostscript no runner Windows.
 
-- splash animado aparece e encerra sem travar a janela;
-- logo/ícone aparecem corretamente;
-- escolher arquivo e drag & drop funcionam;
-- navegação Converter / Histórico / Configurações funciona;
-- versão e assinatura Nith Digital aparecem corretamente.
+Após instalar em uma VM limpa Windows 10/11 x64:
 
-## Conversão
+- a tela de mecanismos deve mostrar ImageMagick, FFmpeg e Ghostscript como instalados/prontos;
+- não deve ser necessário clicar em links ou instalar esses mecanismos manualmente;
+- converter pelo menos uma imagem, um áudio, um vídeo e ler um PDF/PS/EPS;
+- confirmar que o executável, o desinstalador e as pastas importantes continuam visíveis em `Program Files`.
 
-Teste pelo menos:
+## Atualizador
 
-- PNG -> JPG e WEBP;
-- JPG -> PNG;
-- PDF -> PNG com 96/150/300 DPI;
-- MP4 -> MP4 com qualidade/FPS diferentes;
-- MP4 -> WEBM;
-- MP4 -> GIF com FPS/cores diferentes;
-- áudio mantido e removido;
-- nomes com espaços e acentos;
-- destino existente e cancelamento.
+1. Instale a versão anterior.
+2. Publique uma versão superior estável com `nith-update.json`, instalador e SHA-256.
+3. Clique **Verificar agora** e confirme que a versão disponível é exibida.
+4. Faça o download em uma conexão limitada para confirmar que ele não é interrompido pelo antigo limite de 25 segundos.
+5. Confirme o SHA-256.
+6. Clique **Instalar agora**, aceite o UAC e confirme a nova versão após reiniciar.
+7. Teste também com proxy do sistema quando aplicável.
 
-Os formatos avançados devem ser testados com o build exato do ImageMagick/FFmpeg distribuído ou documentado.
+## Release
 
-## Instalador
-
-- executar o setup deve mostrar UAC;
-- instalar em `Program Files`;
-- atalhos funcionam;
-- reinstalação por cima de versão anterior funciona;
-- desinstalação remove o programa sem apagar arquivos convertidos/configurações locais indevidamente.
-
-## Atualização GitHub
-
-1. Instale a versão `vX.Y.Z`.
-2. Publique `vX.Y.(Z+1)`.
-3. Abra a versão antiga.
-4. Confirme que a tela mostra a versão instalada e a maior versão estável publicada.
-5. Confirme download automático e validação SHA-256.
-6. Clique **Instalar agora**.
-7. Aceite UAC.
-8. Confirme que a versão nova foi instalada e que o aplicativo volta a abrir.
-
-## Segurança
-
-- nunca coloque `.pfx`, senhas, tokens ou chaves no Git;
-- valide que `.gitignore` exclui `bin`, `obj`, `artifacts`, `.tools` e certificados;
-- para distribuição pública, use assinatura digital de código.
-
-**Nith Digital - nithdigital.com.br**
+O workflow deve falhar se qualquer dependência obrigatória, instalador, manifesto ou checksum estiver ausente. Só considere a release pronta quando a execução Windows do GitHub Actions estiver verde.

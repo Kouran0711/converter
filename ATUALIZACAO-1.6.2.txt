@@ -1,0 +1,10 @@
+NITH Converter 1.6.2
+
+Correções críticas:
+- ImageMagick, FFmpeg, FFprobe e Ghostscript passam a acompanhar o instalador.
+- VC++ Runtime x64 é preparado automaticamente pelo instalador.
+- O usuário não precisa instalar dependências manualmente.
+- Atualizador preparado para arquivos grandes, com timeout de 30 minutos e fallback por BITS e curl.exe.
+- Verificação usa primeiro nith-update.json e só recorre à API do GitHub quando necessário.
+- A área de dependências ficou somente informativa.
+- Nith Digital na barra lateral abre o site oficial.

@@ -3,6 +3,7 @@ param(
     [ValidateSet('Release', 'Debug')][string]$Configuration = 'Release',
     [switch]$BundleDependencies,
     [switch]$Installer,
+    [switch]$SkipDependencyPreparation,
     [string]$IsccPath = '',
     [string]$Version = ''
 )
@@ -23,7 +24,14 @@ if (-not [string]::IsNullOrWhiteSpace($Version) -and $Version -notmatch '^\d+\.\
     throw 'Versão inválida. Use o formato 1.2.3 ou 1.2.3.4.'
 }
 
-if ($BundleDependencies) {
+# Releases/instaladores são sempre autocontidos: os mecanismos nativos são preparados e
+# validados antes do publish. O switch antigo continua aceito por compatibilidade.
+$includeDependencies = $Installer -or $BundleDependencies
+if ($includeDependencies) {
+    $dependencyManifest = Join-Path $projectRoot 'Installer\Dependencies\bundle-manifest.json'
+    if (-not $SkipDependencyPreparation -or -not (Test-Path -LiteralPath $dependencyManifest)) {
+        & (Join-Path $PSScriptRoot 'Prepare-Dependencies.ps1')
+    }
     & (Join-Path $PSScriptRoot 'Test-DependencyBundle.ps1')
 }
 
@@ -89,12 +97,13 @@ Write-Host "Versão gravada no executável: $($fileInfo.FileVersion)"
     -AssetsFile (Join-Path $projectRoot 'src\NithConverter\obj\project.assets.json') `
     -PublishDirectory $publishDirectory
 Copy-Item -LiteralPath (Join-Path $projectRoot 'THIRD-PARTY-NOTICES.md') -Destination $publishDirectory
-if ($BundleDependencies) {
+if ($includeDependencies) {
     $dependencies = Join-Path $projectRoot 'Installer\Dependencies'
     Get-ChildItem -LiteralPath (Join-Path $dependencies 'payload') -Force | ForEach-Object {
         Copy-Item -LiteralPath $_.FullName -Destination $publishDirectory -Recurse -Force
     }
     Copy-Item -LiteralPath (Join-Path $dependencies 'bundle-manifest.json') -Destination $publishDirectory
+    Write-Host 'Dependências nativas incorporadas ao aplicativo.'
 }
 Write-Host "Aplicativo publicado: $executable"
 

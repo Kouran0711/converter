@@ -10,70 +10,52 @@ Na raiz do projeto:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Publish.ps1
 ```
 
-O resultado fica em:
+O resultado fica em `artifacts/publish/win-x64/`. A publicação é self-contained para .NET e Windows App SDK.
 
-```text
-artifacts/publish/win-x64/
+## Instalador completo com dependências
+
+Para uma entrega destinada ao usuário final, execute:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Publish.ps1 -Installer -Version 1.6.2
 ```
 
-A publicação é self-contained para .NET e Windows App SDK. Distribua a pasta inteira; `PublishSingleFile=false` e `PublishTrimmed=false` são intencionais para compatibilidade com WinUI.
+Quando `-Installer` é usado, o build prepara automaticamente o pacote de dependências antes de publicar. Não é necessário usar um switch extra.
+
+`scripts/Prepare-Dependencies.ps1` baixa e prepara:
+
+- ImageMagick para imagens e criação/leitura de formatos avançados;
+- FFmpeg e ffprobe para áudio, vídeo, extração e progresso real;
+- Ghostscript para leitura de PDF/PS/EPS pelo ImageMagick;
+- Microsoft Visual C++ Redistributable x64 como pré-requisito do setup.
+
+Os três mecanismos de conversão são colocados dentro de `bin/` na própria instalação do NITH Converter. O VC++ Runtime é executado silenciosamente pelo Inno Setup. Assim o usuário não precisa procurar nem clicar em instaladores externos.
+
+O build valida os downloads e gera `Installer/Dependencies/bundle-manifest.json` com hashes dos arquivos incorporados. `scripts/Test-DependencyBundle.ps1` verifica a integridade e faz smoke tests dos executáveis no runner Windows. Uma release não deve ser publicada se um mecanismo obrigatório faltar ou não iniciar.
+
+As pastas `Installer/Dependencies/.cache`, `payload` e `prerequisites` são geradas e ficam fora do Git.
 
 ## Logo e ícones
 
-Mantenha `logo.png` na raiz. Durante o build, `scripts/Generate-Assets.ps1` gera os PNGs de vários tamanhos e `app.ico` dentro de `src/NithConverter/Assets/Generated/`. Essa pasta é gerada e não entra no Git.
-
-## Dependências de conversão
-
-O aplicativo procura mecanismos na instalação local e em locais conhecidos do Windows:
-
-- ImageMagick: imagens e criação de PDF;
-- FFmpeg/ffprobe: vídeos e progresso;
-- Ghostscript: leitura de PDF/PS/EPS.
-
-Alguns formatos dependem dos delegates/codecs incluídos no build específico do ImageMagick ou FFmpeg.
+Mantenha `logo.png` na raiz. Durante o build, `scripts/Generate-Assets.ps1` gera os assets em `src/NithConverter/Assets/Generated/`.
 
 ## Instalador
 
-Instale Inno Setup 6.3+ e execute:
+O setup é por máquina, instala normalmente em `Program Files\NITH Converter` e exige UAC (`PrivilegesRequired=admin`). O aplicativo em si continua com privilégios normais.
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Publish.ps1 -Installer
-```
-
-O instalador fica em `artifacts/installer/`.
-
-O setup é **por máquina**, instala em `{autopf}\NITH Converter` (normalmente `Program Files`) e exige elevação:
-
-```text
-PrivilegesRequired=admin
-```
-
-Isso é intencional. O NITH Converter em si roda com privilégios normais; apenas instalação/atualização solicita UAC.
-
-O Inno Setup está configurado para fechar aplicações que estejam usando os arquivos atualizados e tentar reiniciá-las ao final. O aplicativo registra suporte ao Windows Restart Manager.
+O Inno Setup usa `CloseApplications=yes` e `RestartApplications=yes`. Em atualização, ele fecha/reabre o aplicativo quando o Windows permitir.
 
 ## Atualizações pelo GitHub
 
-O canal oficial é:
+O canal oficial é `https://github.com/Kouran0711/converter/releases`.
 
-```text
-https://github.com/Kouran0711/converter/releases
-```
-
-A atualização automática consulta a lista pública de releases estáveis e escolhe a maior versão semântica. Para a release escolhida, usa `nith-update.json`, checksum `.sha256` e/ou o digest SHA-256 do asset quando disponíveis. O workflow `.github/workflows/release.yml` produz esses arquivos automaticamente e marca a nova release como `Latest`.
+O aplicativo tenta primeiro o manifesto pequeno `nith-update.json` da release Latest. Para compatibilidade, também possui fallback pela API de Releases e pela página `/releases/latest`. O download do instalador usa um cliente separado com timeout longo, proxy do sistema e fallback pelo BITS e, por fim, pelo `curl.exe` do Windows.
 
 Veja `docs/UPDATES.md`.
 
-## Bundle opcional de ImageMagick/FFmpeg
+## Licenças de terceiros
 
-`Installer/Dependencies/` continua disponível para preparar dependências redistribuíveis revisadas. Não inclua builds de terceiros sem revisar suas licenças e os codecs/delegates presentes.
-
-Antes de empacotar:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-DependencyBundle.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Publish.ps1 -Installer -BundleDependencies
-```
+ImageMagick, FFmpeg e Ghostscript são projetos independentes. As licenças/avisos preparados pelo build acompanham o pacote. Ghostscript é disponibilizado pelo fornecedor sob AGPL ou licença comercial; revise a licença aplicável à forma de distribuição adotada pela Nith Digital.
 
 ## Assinatura digital
 

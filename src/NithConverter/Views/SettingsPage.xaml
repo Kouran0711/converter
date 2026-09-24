@@ -41,12 +41,20 @@
 
       <Border Style="{StaticResource Card}"><StackPanel Spacing="15">
         <TextBlock Text="MECANISMOS DE CONVERSÃO" Style="{StaticResource SectionLabel}"/>
-        <StackPanel Spacing="4"><TextBlock Text="ImageMagick" FontWeight="SemiBold"/><TextBlock Text="{Binding ImageMagickStatus}" Foreground="{StaticResource MutedForeground}" TextWrapping="Wrap"/></StackPanel>
-        <StackPanel Spacing="4"><TextBlock Text="FFmpeg" FontWeight="SemiBold"/><TextBlock Text="{Binding FFmpegStatus}" Foreground="{StaticResource MutedForeground}" TextWrapping="Wrap"/></StackPanel>
-        <StackPanel Spacing="4"><TextBlock Text="Documentos PDF / PS / EPS" FontWeight="SemiBold"/><TextBlock Text="{Binding PdfStatus}" Foreground="{StaticResource MutedForeground}" TextWrapping="Wrap"/></StackPanel>
-        <Button Content="Verificar dependências" Command="{Binding CheckDependenciesCommand}"/>
-        <TextBlock Text="O app procura ImageMagick e FFmpeg na pasta bin e nas instalações do Windows. Formatos avançados como HEIC, AVIF, SVG, PSD e alguns vídeos dependem dos codecs/delegates disponíveis na instalação local." TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedForeground}"/>
-        <StackPanel Orientation="Horizontal"><HyperlinkButton Content="ImageMagick" NavigateUri="https://imagemagick.org/script/download.php#windows"/><HyperlinkButton Content="FFmpeg" NavigateUri="https://ffmpeg.org/download.html"/><HyperlinkButton Content="Ghostscript" NavigateUri="https://ghostscript.com/releases/gsdnld.html"/></StackPanel>
+        <Grid ColumnSpacing="18" RowSpacing="14">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+          <Border Background="#0A1727" CornerRadius="10" Padding="14">
+            <StackPanel Spacing="4"><TextBlock Text="ImageMagick" FontWeight="SemiBold"/><TextBlock Text="{Binding ImageMagickStatus}" Foreground="{StaticResource MutedForeground}"/></StackPanel>
+          </Border>
+          <Border Grid.Column="1" Background="#0A1727" CornerRadius="10" Padding="14">
+            <StackPanel Spacing="4"><TextBlock Text="FFmpeg + FFprobe" FontWeight="SemiBold"/><TextBlock Text="{Binding FFmpegStatus}" Foreground="{StaticResource MutedForeground}"/></StackPanel>
+          </Border>
+          <Border Grid.Row="1" Grid.ColumnSpan="2" Background="#0A1727" CornerRadius="10" Padding="14">
+            <StackPanel Spacing="4"><TextBlock Text="Documentos PDF / PS / EPS" FontWeight="SemiBold"/><TextBlock Text="{Binding PdfStatus}" Foreground="{StaticResource MutedForeground}"/></StackPanel>
+          </Border>
+        </Grid>
+        <TextBlock Text="Esses componentes fazem parte do instalador do NITH Converter. Você não precisa baixar ou instalar nada separadamente." TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedForeground}"/>
       </StackPanel></Border>
 
       <Border Style="{StaticResource Card}"><StackPanel Spacing="14">

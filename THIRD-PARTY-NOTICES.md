@@ -1,25 +1,25 @@
 # Componentes de terceiros
 
-NITH Converter executa ImageMagick e FFmpeg como programas externos. Eles são projetos independentes; seus nomes não indicam patrocínio ou autoria do NITH Converter.
+NITH Converter usa componentes independentes de terceiros. Seus nomes não indicam patrocínio ou autoria do NITH Converter.
 
 ## Runtime da aplicação
 
-A publicação Windows x64 inclui os runtimes do .NET e do Windows App SDK. As licenças e avisos específicos dos pacotes restaurados devem acompanhar os arquivos distribuídos.
+A publicação Windows x64 inclui runtimes do .NET e Windows App SDK. O setup também transporta o Microsoft Visual C++ Redistributable x64 oficial e assinado para instalação silenciosa quando necessário.
 
-- .NET: Copyright .NET Foundation and Contributors. [Licença MIT e avisos do runtime](https://github.com/dotnet/runtime/blob/main/LICENSE.TXT).
-- Windows App SDK: Copyright Microsoft Corporation. [Licença do código do projeto](https://github.com/microsoft/WindowsAppSDK/blob/main/LICENSE). Os termos dos pacotes binários usados no build também se aplicam.
-- Inno Setup, quando usado para gerar o instalador: Copyright Jordan Russell; portions Copyright Martijn Laan. [Licença oficial](https://jrsoftware.org/files/is/license.txt).
+## ImageMagick
 
-## ImageMagick — opcional
+ImageMagick é Copyright ImageMagick Studio LLC e colaboradores e é distribuído sob a licença ImageMagick. O build de release baixa o pacote Windows configurado em `scripts/Prepare-Dependencies.ps1`, prepara uma cópia privada dentro do aplicativo e inclui a licença/avisos no diretório `licenses/`.
 
-Copyright ImageMagick Studio LLC e colaboradores. A [licença ImageMagick](https://imagemagick.org/license/) permite redistribuição com atribuição e cópia da licença. Inclua também os avisos e termos dos delegates presentes no build escolhido. A versão e os arquivos efetivamente incluídos constam em `bundle-manifest.json` quando houver bundle.
+## FFmpeg
 
-## FFmpeg — opcional
+FFmpeg é um projeto independente. O pipeline usa um build Windows x64 marcado como LGPL e inclui texto de licença, referência de fonte e configuração do build. Este projeto não seleciona um build marcado `nonfree`.
 
-FFmpeg é um projeto de seus desenvolvedores; FFmpeg é marca de Fabrice Bellard. Sua licença varia com a configuração: LGPL por padrão, GPL quando componentes GPL são habilitados. Consulte os [termos oficiais](https://ffmpeg.org/legal.html). Um pacote com FFmpeg deve identificar a licença efetiva e incluir seus textos, avisos, configuração e fonte correspondente ao binário. Este projeto não empacota builds `--enable-nonfree`.
+## Ghostscript
 
-## Conteúdo desta entrega
+Ghostscript é Copyright Artifex Software, Inc. O fornecedor oferece Ghostscript sob GNU AGPL e também sob licença comercial. O pipeline inclui informação de licença/fonte junto do runtime. A Nith Digital deve usar os termos adequados à forma de redistribuição escolhida.
 
-O código-fonte não inclui binários de ImageMagick, FFmpeg ou Ghostscript. Uma publicação comum não baixa nem incorpora esses programas. Um bundle opcional acrescenta os componentes expressamente revisados e seus avisos em `licenses/`; o manifesto identifica cada arquivo por SHA-256.
+## Integridade e procedência
 
-Esta relação não concede uma licença para redistribuir a logo ou outros materiais do proprietário do NITH Converter.
+`scripts/Prepare-Dependencies.ps1` usa fontes configuradas explicitamente; onde o provedor/GitHub publica digest SHA-256, o build o confere antes de incorporar o arquivo. O `bundle-manifest.json` gerado registra as versões, origens e SHA-256 dos arquivos efetivamente embarcados.
+
+Esta relação não concede uma licença para redistribuir a identidade visual ou outros materiais proprietários do NITH Converter.

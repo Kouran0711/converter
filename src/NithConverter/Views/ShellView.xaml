@@ -50,7 +50,7 @@
         <StackPanel Margin="16,10,16,18" Spacing="7">
           <TextBlock Text="LOCAL. SIMPLES. NATIVO." FontSize="9" CharacterSpacing="80" Foreground="{StaticResource MutedForeground}"/>
           <TextBlock Text="{Binding AppVersionText}" FontSize="11" Foreground="White"/>
-          <TextBlock Text="Nith Digital" FontSize="10" Foreground="#8AB4D8"/>
+          <HyperlinkButton Content="Nith Digital · nithdigital.com.br" NavigateUri="https://nithdigital.com.br" FontSize="10" Foreground="#8AB4D8" Padding="0" HorizontalAlignment="Left"/>
         </StackPanel>
       </NavigationView.PaneFooter>
 

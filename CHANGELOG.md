@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.2
+- Instalador passa a incluir ImageMagick, FFmpeg, FFprobe e Ghostscript no próprio aplicativo; não é necessário instalar esses mecanismos manualmente.
+- Instalador também prepara o Microsoft Visual C++ 2015-2022 Runtime x64, usado por componentes nativos.
+- Pipeline de release baixa, verifica, testa e incorpora as dependências automaticamente antes de publicar.
+- Atualizador corrigido para downloads grandes: cliente separado com timeout de 30 minutos, HTTP/1.1, proxy do Windows e fallback por BITS e curl.exe.
+- Verificação de atualização prioriza o manifesto `nith-update.json`, reduzindo dependência do limite público da API do GitHub.
+- Tela de mecanismos agora é apenas informativa, sem links/botões de instalação externos.
+- Link da Nith Digital na barra lateral abre `nithdigital.com.br`.
+
 ## 1.5.3
 - Corrigida a limpeza visual da pasta de instalação: versões anteriores ocultavam tudo, inclusive pastas e desinstalador.
 - Em upgrades, o instalador restaura primeiro a visibilidade dos itens antigos que ficaram ocultos.

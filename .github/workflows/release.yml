@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Versão da release (ex.: 1.5.3)'
+        description: 'Versão da release (ex.: 1.6.2)'
         required: true
-        default: '1.5.3'
+        default: '1.6.2'
         type: string
 
 permissions:
@@ -18,6 +18,7 @@ permissions:
 jobs:
   release:
     runs-on: windows-latest
+    timeout-minutes: 90
 
     steps:
       - name: Baixar código
@@ -66,6 +67,20 @@ jobs:
         shell: pwsh
         run: |
           .\scripts\Publish.ps1 -Installer -Version '${{ steps.version.outputs.version }}'
+
+      - name: Confirmar mecanismos incorporados
+        shell: pwsh
+        run: |
+          $required = @(
+            '.\artifacts\publish\win-x64\bin\ImageMagick\magick.exe',
+            '.\artifacts\publish\win-x64\bin\FFmpeg\ffmpeg.exe',
+            '.\artifacts\publish\win-x64\bin\FFmpeg\ffprobe.exe',
+            '.\artifacts\publish\win-x64\bin\Ghostscript\bin\gswin64c.exe'
+          )
+          foreach ($file in $required) {
+            if (-not (Test-Path -LiteralPath $file)) { throw "Dependência não foi incorporada ao release: $file" }
+          }
+          Write-Host 'ImageMagick, FFmpeg, FFprobe e Ghostscript estão dentro do pacote final.'
 
       - name: Criar pacote portátil, manifesto e checksums
         id: assets
@@ -175,6 +190,40 @@ jobs:
             throw "A release $tag foi publicada, mas o GitHub não a marcou como Latest."
           }
           Write-Host "Release $tag publicada e marcada como Latest: $($published.url)"
+
+      - name: Validar canal público de atualização
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '${{ steps.version.outputs.version }}'
+          $tag = '${{ steps.version.outputs.tag }}'
+          $manifestUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/latest/download/nith-update.json"
+          $manifest = $null
+          for ($attempt = 1; $attempt -le 6; $attempt++) {
+            try {
+              $manifest = Invoke-RestMethod -Uri $manifestUrl -MaximumRedirection 10 -Headers @{ 'User-Agent' = 'NITHConverter-ReleaseValidator/1.6' }
+              if ($manifest.version -eq $version -and $manifest.tag -eq $tag) { break }
+              throw "Manifesto Latest ainda aponta para $($manifest.version) / $($manifest.tag)."
+            }
+            catch {
+              if ($attempt -eq 6) { throw }
+              Write-Host "Latest ainda propagando ($attempt/6): $($_.Exception.Message)"
+              Start-Sleep -Seconds 10
+            }
+          }
+          if ($null -eq $manifest) { throw 'Manifesto público não pôde ser lido.' }
+          if ($manifest.installer -ne 'NITH.Converter.exe') { throw "Nome inesperado no manifesto: $($manifest.installer)" }
+
+          $installerUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/$($manifest.installer)"
+          $header = Join-Path $env:RUNNER_TEMP 'nith-installer-header.bin'
+          Remove-Item -LiteralPath $header -Force -ErrorAction SilentlyContinue
+          & curl.exe --fail --location --silent --show-error --retry 3 --range 0-1 --max-filesize 1024 --output $header $installerUrl
+          if ($LASTEXITCODE -ne 0) { throw 'O asset público do instalador não respondeu ao download.' }
+          $bytes = [IO.File]::ReadAllBytes($header)
+          if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) {
+            throw 'O endpoint público do instalador não retornou um executável Windows (MZ).'
+          }
+          Write-Host "Canal público validado: $manifestUrl -> $version; instalador acessível."
 
       - name: Guardar artefatos do build
         if: always()
