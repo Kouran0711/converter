@@ -273,14 +273,19 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             {
                 _pendingUpdate = null; _downloadedUpdate = null;
                 UpdateStatus = "NITH Converter está atualizado";
-                UpdateDetail = $"Você está usando a versão {AppInfo.VersionText}.";
+                string latest = _updates.LastKnownLatestVersion is null
+                    ? "nenhuma release estável publicada"
+                    : FormatVersion(_updates.LastKnownLatestVersion);
+                UpdateDetail = $"Instalada: {AppInfo.VersionText} · Mais recente no GitHub: {latest}.";
                 SetUpdateBanner(force, actionVisible: false);
                 return;
             }
 
             _pendingUpdate = release;
-            UpdateStatus = $"Nova versão {release.Version.Major}.{release.Version.Minor}.{release.Version.Build} disponível";
-            UpdateDetail = "A atualização oficial foi encontrada no GitHub Releases.";
+            UpdateStatus = $"Nova versão {FormatVersion(release.Version)} disponível";
+            UpdateDetail = release.HasIntegrityVerification
+                ? $"Instalada: {AppInfo.VersionText} · GitHub: {FormatVersion(release.Version)}. O instalador será validado por SHA-256."
+                : $"Instalada: {AppInfo.VersionText} · GitHub: {FormatVersion(release.Version)}. Esta release antiga não publicou SHA-256; o download será feito diretamente do GitHub por HTTPS.";
             UpdateActionText = Settings.AutoDownloadUpdates ? "Baixando…" : "Baixar atualização";
             SetUpdateBanner(true, actionVisible: !Settings.AutoDownloadUpdates);
             if (Settings.AutoDownloadUpdates) await DownloadPendingUpdateAsync();
@@ -291,10 +296,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             UpdateStatus = "Não foi possível verificar atualizações";
             UpdateDetail = ex.StatusCode switch
             {
-                System.Net.HttpStatusCode.Forbidden => "O GitHub recusou temporariamente a consulta. Sua internet pode estar normal; tente novamente em alguns minutos.",
-                System.Net.HttpStatusCode.TooManyRequests => "O GitHub limitou temporariamente as consultas. Tente novamente em alguns minutos.",
-                System.Net.HttpStatusCode.NotFound => "A fonte de atualização não foi encontrada no GitHub.",
-                _ => "O GitHub não respondeu corretamente. Tente novamente em alguns instantes; isso não significa necessariamente falha na sua internet."
+                System.Net.HttpStatusCode.Forbidden => "O GitHub recusou temporariamente a consulta ou atingiu o limite público. A versão não foi considerada atualizada; tente novamente em alguns minutos.",
+                System.Net.HttpStatusCode.TooManyRequests => "O GitHub limitou temporariamente as consultas. A versão não foi considerada atualizada; tente novamente em alguns minutos.",
+                System.Net.HttpStatusCode.NotFound => "O repositório ou a fonte de atualização não foi encontrada no GitHub.",
+                _ => ex.Message
             };
             SetUpdateBanner(force, actionVisible: false);
             await _logger.WriteAsync("update.check_failed", $"{ex.GetType().Name}; status={(int?)ex.StatusCode}; {ex.Message}");
@@ -313,7 +318,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         if (_pendingUpdate is null) return;
         UpdateStatus = $"Baixando atualização {_pendingUpdate.Tag}…";
-        UpdateDetail = "O instalador será verificado por SHA-256 antes de ficar disponível.";
+        UpdateDetail = _pendingUpdate.HasIntegrityVerification
+            ? "O instalador será verificado por SHA-256 antes de ficar disponível."
+            : "Baixando o instalador oficial diretamente do GitHub. Esta release não possui SHA-256 publicado.";
         UpdateProgress = 0;
         UpdateActionText = "Baixando…";
         SetUpdateBanner(true, actionVisible: false);
@@ -323,7 +330,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             _downloadedUpdate = await _updates.DownloadAsync(_pendingUpdate, numericProgress, _lifetime.Token);
             UpdateProgress = 100;
             UpdateStatus = $"Atualização {_pendingUpdate.Tag} pronta";
-            UpdateDetail = "Clique em Instalar agora. O Windows pedirá permissão de administrador; o instalador fechará e tentará reabrir o aplicativo.";
+            string integrity = _downloadedUpdate.IntegrityVerified
+                ? "SHA-256 confirmado. "
+                : "Download concluído pelo GitHub. ";
+            UpdateDetail = integrity + "Clique em Instalar agora. O Windows pedirá permissão de administrador; o instalador fechará e tentará reabrir o aplicativo.";
             UpdateActionText = "Instalar agora";
             SetUpdateBanner(true, actionVisible: true);
             await _logger.WriteAsync("update.downloaded", _pendingUpdate.Tag);
@@ -369,6 +379,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         UpdateStatus = "Instalando atualização…";
         UpdateDetail = "O instalador fechará o NITH Converter, substituirá os arquivos e tentará reabrir o aplicativo.";
     }
+
+    private static string FormatVersion(Version version) =>
+        $"{version.Major}.{version.Minor}.{Math.Max(0, version.Build)}";
 
     private void SetUpdateBanner(bool visible, bool actionVisible)
     {

@@ -20,21 +20,23 @@ Conversor de arquivos para Windows feito para transformar imagens, documentos, v
 - Histórico local de conversões e pasta padrão de saída.
 - Tela de abertura animada, nova identidade visual e interface modernizada inspirada na Nith Digital.
 - Verificação de atualização pelo GitHub Releases.
-- Download automático do instalador de atualização, com verificação SHA-256 antes de permitir a instalação.
+- Download automático do instalador de atualização, com verificação SHA-256 quando a release fornece hash/digest.
 
 > A disponibilidade real de alguns formatos depende da compilação do ImageMagick, FFmpeg, Ghostscript e dos codecs/delegates instalados no computador.
 
 ## Atualizações automáticas
 
-O aplicativo consulta a release pública mais recente de `Kouran0711/converter`. Quando encontra uma versão superior à instalada, ele pode baixar automaticamente o instalador `NITH Converter.exe`. As releases novas publicam também `nith-update.json`, usado como fonte principal da versão e do SHA-256; a API do GitHub fica como fallback para releases antigas.
+O aplicativo consulta a lista pública de releases estáveis de `Kouran0711/converter`, interpreta as tags `vX.Y.Z` e escolhe a **maior versão semântica**. Assim ele não depende apenas do marcador “Latest” do GitHub para decidir se há atualização. Quando encontra uma versão superior à instalada, baixa o instalador estável `NITH.Converter.exe`.
 
-O instalador é validado antes de ficar disponível. Ao clicar em **Instalar agora**, o Windows mostra a confirmação de administrador (UAC), o Inno Setup atualiza os arquivos em `Program Files` e usa o Restart Manager para fechar/reabrir o aplicativo quando possível.
+A versão instalada é lida dos metadados gravados no executável durante o build. O workflow também valida que a versão do executável corresponde à versão informada na publicação antes de criar a release.
 
-As releases novas incluem um manifesto `nith-update.json` para tornar a verificação mais confiável. Por compatibilidade, o app também entende releases antigas com instalador + `.sha256`:
+O instalador é validado por SHA-256 quando a release fornece o hash no `nith-update.json`, no arquivo `.sha256` ou no digest do próprio asset do GitHub. Releases antigas sem hash continuam detectáveis, mas o aplicativo informa que a verificação SHA-256 não estava disponível. Ao clicar em **Instalar agora**, o Windows mostra a confirmação de administrador (UAC), o Inno Setup atualiza os arquivos em `Program Files` e usa o Restart Manager para fechar/reabrir o aplicativo quando possível.
+
+As releases novas incluem:
 
 ```text
-NITH Converter.exe
-NITH Converter.exe.sha256
+NITH.Converter.exe
+NITH.Converter.exe.sha256
 nith-update.json
 ```
 
@@ -66,7 +68,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Publish.ps1 -Install
 Publicar uma versão específica:
 
 ```powershell
-.\scripts\Publish.ps1 -Installer -Version 1.3.1
+.\scripts\Publish.ps1 -Installer -Version 1.5.2
 ```
 
 Saídas:
@@ -83,8 +85,8 @@ O instalador exige administrador por projeto (`PrivilegesRequired=admin`). O apl
 Depois de enviar o código para o GitHub, uma release pode ser criada apenas com uma tag:
 
 ```powershell
-git tag v1.3.1
-git push origin v1.3.1
+git tag v1.5.2
+git push origin v1.5.2
 ```
 
 O GitHub Actions compila no Windows, cria o instalador, pacote portátil e checksums SHA-256 e publica a GitHub Release automaticamente.
@@ -105,7 +107,7 @@ Arquivos de build (`bin`, `obj`, `artifacts`, `.tools`, assets gerados etc.) fic
 
 ## Privacidade
 
-As conversões são locais. Configurações, histórico limitado e logs ficam em `%LOCALAPPDATA%\NITH Converter`. A verificação de atualização acessa apenas endpoints públicos do GitHub Releases (manifesto/asset) e usa a API pública apenas como fallback de compatibilidade.
+As conversões são locais. Configurações, histórico limitado e logs ficam em `%LOCALAPPDATA%\NITH Converter`. A verificação de atualização acessa apenas endpoints públicos do GitHub Releases e a API pública do GitHub para localizar a release estável mais recente.
 
 ---
 

@@ -72,6 +72,19 @@ finally { Pop-Location }
 
 $executable = Join-Path $publishDirectory 'NITHConverter.exe'
 if (-not (Test-Path -LiteralPath $executable)) { throw 'A publicação não produziu NITHConverter.exe.' }
+
+# Garante que a versão exibida pelo app e gravada no executável corresponde à versão solicitada no release.
+$fileInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo($executable)
+if (-not [string]::IsNullOrWhiteSpace($Version)) {
+    $requested = [Version]$Version
+    $actual = [Version]($fileInfo.FileVersion.Split('+')[0])
+    $requestedNormalized = [Version]::new($requested.Major, $requested.Minor, [Math]::Max(0, $requested.Build), [Math]::Max(0, $requested.Revision))
+    $actualNormalized = [Version]::new($actual.Major, $actual.Minor, [Math]::Max(0, $actual.Build), [Math]::Max(0, $actual.Revision))
+    if ($actualNormalized -ne $requestedNormalized) {
+        throw "Versão do executável ($actualNormalized) não corresponde à versão solicitada ($requestedNormalized)."
+    }
+}
+Write-Host "Versão gravada no executável: $($fileInfo.FileVersion)"
 & (Join-Path $PSScriptRoot 'Copy-RuntimeNotices.ps1') `
     -AssetsFile (Join-Path $projectRoot 'src\NithConverter\obj\project.assets.json') `
     -PublishDirectory $publishDirectory

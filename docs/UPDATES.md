@@ -1,116 +1,125 @@
 # Atualizações automáticas do NITH Converter
 
-Este projeto já está preparado para usar **GitHub Releases** como canal de atualização.
+Este projeto usa **GitHub Releases** como canal de atualização.
 
 ## Como funciona
 
-1. O NITH Converter inicia normalmente.
-2. Se **Verificar ao abrir o aplicativo** estiver ativado, consulta a release pública mais recente em `Kouran0711/converter`.
-3. Compara a tag da release (`v1.3.1`, por exemplo) com a versão do executável instalado.
-4. O app tenta primeiro baixar `nith-update.json` da release mais recente. Se o manifesto ainda não existir, usa a API do GitHub como compatibilidade.
-5. Quando existe uma versão superior, baixa `NITH Converter.exe` e valida o SHA-256 antes de oferecer a instalação.
-6. Se **Baixar novas versões automaticamente** estiver ativado, baixa o instalador em `%LOCALAPPDATA%\NITH Converter\Updates`.
-7. O SHA-256 do instalador baixado é comparado com o valor publicado no manifesto (ou no `.sha256` das releases antigas).
-8. Depois da validação, aparece **Instalar agora**.
-9. O instalador é iniciado com elevação (`runas`), então o Windows mostra UAC.
-10. O Inno Setup atualiza a instalação em `Program Files`. Ele foi configurado com `PrivilegesRequired=admin`, `CloseApplications=yes` e `RestartApplications=yes`.
+1. O aplicativo lê sua versão real dos metadados gravados no executável (`InformationalVersion` / `FileVersion`).
+2. Se **Verificar ao abrir o aplicativo** estiver ativado, consulta as releases públicas de `Kouran0711/converter`.
+3. Ignora drafts e pre-releases, interpreta as tags `vX.Y.Z` e escolhe a **maior versão semântica**.
+4. Compara essa versão com a instalada. O nome do instalador não precisa conter o número da versão.
+5. Para a release escolhida, procura `nith-update.json`, `NITH.Converter.exe`, o `.sha256` correspondente e também aceita o digest SHA-256 retornado pelo próprio GitHub.
+6. Se existir uma versão superior, baixa o instalador para `%LOCALAPPDATA%\NITH Converter\Updates`.
+7. Quando existe hash esperado, confere o SHA-256 antes de liberar a instalação. Releases antigas sem hash ainda são reconhecidas, mas a interface informa que a validação não estava disponível.
+8. Ao clicar em **Instalar agora**, o instalador é iniciado com elevação e o Windows mostra UAC.
+9. O Inno Setup atualiza `Program Files` com `PrivilegesRequired=admin`, `CloseApplications=yes` e `RestartApplications=yes`.
 
-## Primeira publicação no GitHub
+O código mantém um fallback via `/releases/latest` para situações em que a API pública do GitHub estiver temporariamente indisponível. Se esse fallback indicar que a versão instalada é a mais nova, mas a lista completa não puder ser confirmada, o aplicativo **não afirma que está atualizado**; ele mostra que a verificação não pôde ser concluída.
 
-Na pasta do projeto:
+## Arquivos publicados em cada release
 
-```powershell
-git init
-git add .
-git commit -m "NITH Converter 1.3.1"
-git branch -M main
-git remote add origin https://github.com/Kouran0711/converter.git
-git push -u origin main
+O workflow gera e publica automaticamente:
+
+```text
+NITH.Converter.exe
+NITH.Converter.exe.sha256
+NITH.Converter.Portable.zip
+NITH.Converter.Portable.zip.sha256
+nith-update.json
 ```
 
-Se `origin` já existir:
+Exemplo de manifesto:
 
-```powershell
-git remote -v
-git remote set-url origin https://github.com/Kouran0711/converter.git
-git push -u origin main
+```json
+{
+  "schema": 2,
+  "version": "1.5.2",
+  "tag": "v1.5.2",
+  "title": "NITH Converter 1.5.2",
+  "installer": "NITH.Converter.exe",
+  "sha256": "<sha256>",
+  "size": 12345678
+}
 ```
 
-## Criar a primeira release
+## Publicar a versão 1.5.2
 
-O código desta entrega está com versão base `1.3.1`. Depois que `main` estiver no GitHub:
+Depois de enviar o código para `main`, abra **GitHub > Actions > Build e publicar release > Run workflow** e informe:
 
-```powershell
-git tag v1.3.1
-git push origin v1.3.1
+```text
+1.5.2
 ```
-
-A tag dispara `.github/workflows/release.yml`.
 
 O workflow:
 
 - usa `windows-latest`;
-- instala/configura .NET 10;
+- configura .NET 10;
 - instala Inno Setup;
 - executa `scripts/Publish.ps1 -Installer -Version <versão>`;
-- cria um ZIP portátil;
-- calcula SHA-256 do instalador e do ZIP;
-- cria uma GitHub Release com notas automáticas.
+- valida que a versão gravada no executável corresponde ao número solicitado;
+- cria instalador, pacote portátil, hashes e manifesto;
+- cria ou atualiza a release;
+- garante que ela não é draft nem pre-release;
+- marca a release como **Latest**;
+- confere se os assets obrigatórios realmente estão publicados.
+
+Também é possível publicar por tag:
+
+```powershell
+git tag v1.5.2
+git push origin v1.5.2
+```
 
 ## Publicar a próxima atualização
 
-Faça suas alterações e aumente a versão. Você não precisa editar o `.csproj` toda vez se publicar pelo workflow, porque a versão da tag é enviada ao build.
-
-Exemplo para `1.3.2`:
+Exemplo para `1.5.3`:
 
 ```powershell
-git add .
-git commit -m "Atualização 1.3.2"
+git add -A
+git commit -m "NITH Converter 1.5.3"
 git push origin main
-git tag v1.3.2
-git push origin v1.3.2
 ```
 
-Quem estiver usando `1.3.1` verá `1.3.2`, o instalador será baixado automaticamente (configuração padrão) e ficará pronto para instalação.
+Depois execute o workflow manual com `1.5.3`, ou crie a tag:
+
+```powershell
+git tag v1.5.3
+git push origin v1.5.3
+```
+
+Quem estiver usando `1.5.2` deverá ver **Instalada: 1.5.2 · GitHub: 1.5.3**, baixar o instalador e receber a opção **Instalar agora**.
 
 ## Regra de versão
 
-Use tags no formato:
+Use versões crescentes no formato:
 
 ```text
-v1.3.1
-v1.3.2
-v1.4.0
+v1.5.2
+v1.5.3
+v1.6.0
 v2.0.0
 ```
 
-Evite reutilizar a mesma tag para builds diferentes.
+Não reutilize a mesma tag para builds diferentes.
 
 ## Testar o atualizador
 
-1. Publique e instale `v1.3.1`.
+1. Publique e instale `v1.5.2`.
 2. Faça uma pequena mudança no código.
-3. Publique a tag `v1.3.2`.
-4. Abra a instalação `1.3.1`.
-5. O app deve encontrar `1.3.2` e baixar o instalador.
-6. Confira a tela **Configurações > Atualizações**.
-7. Clique em **Instalar agora** e aceite o UAC.
-8. Depois da instalação, confirme a versão exibida no menu/configurações.
+3. Publique `v1.5.3`.
+4. Abra a instalação `1.5.2`.
+5. Em **Configurações > Atualizações**, confirme que a tela mostra a versão instalada e a versão encontrada no GitHub.
+6. Baixe a atualização e confirme a mensagem de SHA-256 validado.
+7. Clique em **Instalar agora**, aceite o UAC e confirme que a nova versão aparece após reiniciar.
 
 ## Se o GitHub Action falhar
 
-Abra **GitHub > Actions > Build e publicar release** e veja o primeiro passo em vermelho. Os pontos mais comuns são:
+Abra **GitHub > Actions > Build e publicar release** e veja o primeiro passo em vermelho. Os pontos mais comuns são SDK .NET incompatível, erro de compilação WinUI, Inno Setup, versão fora do formato ou permissão de `contents: write`.
 
-- SDK .NET incompatível;
-- erro de compilação WinUI;
-- Inno Setup não instalado pelo runner;
-- tag fora do formato `vX.Y.Z`;
-- permissão de `contents: write` bloqueada pela configuração do repositório.
-
-Em **Settings > Actions > General**, confirme que os workflows podem usar o `GITHUB_TOKEN` com acesso de escrita quando necessário.
+Em **Settings > Actions > General**, confirme que o workflow pode usar `GITHUB_TOKEN` com acesso de escrita.
 
 ## Segurança
 
-O checksum SHA-256 detecta arquivo corrompido ou diferente do publicado, mas não substitui assinatura digital de código. Para distribuição pública mais madura, o próximo passo recomendado é assinar `NITHConverter.exe` e o instalador com um certificado de assinatura de código e guardar o certificado/segredo fora do repositório, preferencialmente em GitHub Actions Secrets ou em um serviço de assinatura.
+O SHA-256 detecta arquivo diferente do publicado, mas não substitui assinatura digital de código. Para distribuição pública madura, assine o executável e o instalador com certificado de code signing e mantenha as credenciais fora do repositório.
 
 **Nith Digital - nithdigital.com.br**

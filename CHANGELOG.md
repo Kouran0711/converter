@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.5.2
+- Atualizador refeito para consultar a lista de releases estáveis e escolher a maior versão sem depender apenas do marcador “Latest”.
+- Corrigido o caso em que um manifesto antigo fazia o app dizer incorretamente que já estava atualizado.
+- Suporte explícito ao instalador `NITH.Converter.exe`, além dos nomes legados.
+- Versão instalada passa a ser lida de `InformationalVersion`/`FileVersion`, com validação no build antes de publicar a release.
+- O updater usa SHA-256 do manifesto, do arquivo `.sha256` ou do digest fornecido pelo próprio GitHub quando disponível.
+- Releases antigas sem checksum continuam detectáveis; o app informa quando o download não pôde ser validado por SHA-256.
+- Workflow marca a release publicada como estável e `Latest` e valida a presença dos assets obrigatórios.
+- Tela de atualização mostra separadamente a versão instalada e a versão mais recente encontrada no GitHub.
+
+
 ## 1.3.1
 - Correção completa do aproveitamento de largura da interface em tela maximizada.
 - Painel de opções ampliado e componentes reorganizados para evitar cortes e elementos amontoados.

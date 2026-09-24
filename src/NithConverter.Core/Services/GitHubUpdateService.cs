@@ -9,15 +9,26 @@ namespace NithConverter.Core.Services;
 
 /// <summary>
 /// Atualização pública via GitHub Releases.
-/// Primeiro usa um manifesto estável publicado como asset da release, evitando limites da API.
-/// Se o manifesto ainda não existir (releases antigas), usa a API REST como fallback.
+/// A consulta principal lista as releases estáveis e escolhe a maior versão sem depender do marcador "Latest".
+/// O marcador Latest + manifesto continua como fallback quando a API pública do GitHub está indisponível.
 /// </summary>
 public sealed class GitHubUpdateService
 {
     private const string ManifestAssetName = "nith-update.json";
+    private const string GitHubApiVersion = "2026-03-10";
+    private static readonly string[] KnownInstallerNames =
+    [
+        "NITH.Converter.exe",
+        "NITH Converter.exe",
+        "NITHConverter.exe"
+    ];
+
     private readonly string _owner;
     private readonly string _repository;
     private readonly HttpClient _http;
+
+    public Version? LastKnownLatestVersion { get; private set; }
+    public string LastCheckSource { get; private set; } = "";
 
     public GitHubUpdateService(string owner, string repository, HttpClient? httpClient = null)
     {
@@ -47,119 +58,207 @@ public sealed class GitHubUpdateService
 
     public async Task<UpdateRelease?> CheckAsync(Version currentVersion, CancellationToken cancellationToken = default)
     {
-        Exception? manifestFailure = null;
+        Version current = Normalize(currentVersion);
+        LastKnownLatestVersion = null;
+        LastCheckSource = "";
+
+        Exception? apiFailure = null;
         try
         {
-            (bool found, UpdateRelease? release) = await TryCheckManifestAsync(currentVersion, cancellationToken).ConfigureAwait(false);
-            if (found) return release;
+            ApiRelease? candidate = await GetHighestStableReleaseFromApiAsync(cancellationToken).ConfigureAwait(false);
+            LastCheckSource = "GitHub Releases";
+            LastKnownLatestVersion = candidate?.Version;
+
+            if (candidate is null || candidate.Version <= current)
+                return null;
+
+            return await BuildReleaseFromApiAsync(candidate, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (IsRecoverableCheckFailure(ex))
+        {
+            apiFailure = ex;
+        }
+
+        // Fallback sem API: segue /releases/latest, lê a tag final e tenta manifesto/nomes conhecidos.
+        // Se ele disser que não há versão nova, NÃO declaramos "atualizado" porque a consulta completa falhou.
+        try
+        {
+            UpdateRelease? fallback = await TryGetLatestReleaseWithoutApiAsync(cancellationToken).ConfigureAwait(false);
+            LastCheckSource = "GitHub Latest (fallback)";
+            LastKnownLatestVersion = fallback?.Version;
+
+            if (fallback is not null && fallback.Version > current)
+                return fallback;
+
+            string observed = fallback is null ? "nenhuma versão identificável" : FormatVersion(fallback.Version);
+            throw new HttpRequestException(
+                $"O GitHub informou {observed} pelo fallback, mas a lista completa de releases não pôde ser consultada. " +
+                "Por segurança o aplicativo não vai afirmar que está atualizado até conseguir confirmar a lista de releases.",
+                apiFailure);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception fallbackFailure) when (IsRecoverableCheckFailure(fallbackFailure))
+        {
+            if (fallbackFailure is HttpRequestException http && http.InnerException == apiFailure)
+                throw;
+
+            HttpStatusCode? status = (apiFailure as HttpRequestException)?.StatusCode ??
+                                     (fallbackFailure as HttpRequestException)?.StatusCode;
+            throw new HttpRequestException(
+                "Não foi possível confirmar a versão mais recente no GitHub. A consulta pela API e o fallback público falharam.",
+                new AggregateException(apiFailure ?? fallbackFailure, fallbackFailure),
+                status);
+        }
+    }
+
+    private async Task<ApiRelease?> GetHighestStableReleaseFromApiAsync(CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            $"https://api.github.com/repos/{Escape(_owner)}/{Escape(_repository)}/releases?per_page=100");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+        request.Headers.Add("X-GitHub-Api-Version", GitHubApiVersion);
+        request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true };
+
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            throw new HttpRequestException("O repositório de atualizações não foi encontrado no GitHub.", null, response.StatusCode);
+        if (response.StatusCode == HttpStatusCode.Forbidden || response.StatusCode == HttpStatusCode.TooManyRequests)
+            throw CreateRateLimitException(response);
+
+        response.EnsureSuccessStatusCode();
+        await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using JsonDocument json = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (json.RootElement.ValueKind != JsonValueKind.Array)
+            throw new InvalidDataException("O GitHub retornou uma lista de releases em formato inesperado.");
+
+        var releases = new List<ApiRelease>();
+        foreach (JsonElement item in json.RootElement.EnumerateArray())
+        {
+            bool draft = item.TryGetProperty("draft", out JsonElement draftElement) && draftElement.ValueKind == JsonValueKind.True;
+            bool prerelease = item.TryGetProperty("prerelease", out JsonElement preElement) && preElement.ValueKind == JsonValueKind.True;
+            if (draft || prerelease) continue;
+
+            string tag = OptionalString(item, "tag_name") ?? "";
+            if (!TryParseVersion(tag, out Version? version) || version is null) continue;
+
+            string title = OptionalString(item, "name") ?? $"NITH Converter {FormatVersion(version)}";
+            string pageText = OptionalString(item, "html_url") ??
+                              $"https://github.com/{_owner}/{_repository}/releases/tag/{Escape(tag)}";
+            if (!Uri.TryCreate(pageText, UriKind.Absolute, out Uri? pageUri))
+                pageUri = new Uri($"https://github.com/{_owner}/{_repository}/releases/tag/{Escape(tag)}");
+
+            var assets = new List<ReleaseAsset>();
+            if (item.TryGetProperty("assets", out JsonElement assetsElement) && assetsElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (JsonElement asset in assetsElement.EnumerateArray())
+                {
+                    string name = OptionalString(asset, "name") ?? "";
+                    string url = OptionalString(asset, "browser_download_url") ?? "";
+                    long size = asset.TryGetProperty("size", out JsonElement sizeElement) && sizeElement.TryGetInt64(out long parsedSize)
+                        ? parsedSize : 0;
+                    string? digest = OptionalString(asset, "digest");
+                    assets.Add(new ReleaseAsset(name, url, size, ParseSha256Digest(digest)));
+                }
+            }
+
+            releases.Add(new ApiRelease(version, tag, title, pageUri, assets));
+        }
+
+        return releases
+            .OrderByDescending(release => release.Version)
+            .FirstOrDefault();
+    }
+
+    private async Task<UpdateRelease> BuildReleaseFromApiAsync(ApiRelease candidate, CancellationToken cancellationToken)
+    {
+        ReleaseAsset? manifestAsset = candidate.Assets.FirstOrDefault(asset =>
+            asset.Name.Equals(ManifestAssetName, StringComparison.OrdinalIgnoreCase) &&
+            Uri.TryCreate(asset.Url, UriKind.Absolute, out _));
+
+        if (manifestAsset is not null)
+        {
+            try
+            {
+                UpdateManifest? manifest = await TryReadManifestAsync(new Uri(manifestAsset.Url), cancellationToken).ConfigureAwait(false);
+                if (manifest is not null && manifest.Version == candidate.Version)
+                {
+                    ReleaseAsset? installerFromManifest = candidate.Assets.FirstOrDefault(asset =>
+                        asset.Name.Equals(manifest.InstallerFileName, StringComparison.OrdinalIgnoreCase));
+                    Uri installerUri = installerFromManifest is not null && Uri.TryCreate(installerFromManifest.Url, UriKind.Absolute, out Uri? assetUri)
+                        ? assetUri
+                        : BuildAssetUri(candidate.Tag, manifest.InstallerFileName);
+                    long size = installerFromManifest?.Size ?? manifest.Size;
+                    string? hash = manifest.Sha256 ?? installerFromManifest?.Sha256;
+                    Uri? checksum = FindChecksumUri(candidate.Assets, manifest.InstallerFileName);
+
+                    return new UpdateRelease(candidate.Version, candidate.Tag, candidate.Title,
+                        manifest.InstallerFileName, installerUri, checksum, hash, size, candidate.ReleasePageUri);
+                }
+            }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or JsonException)
+            {
+                // O manifesto é um acelerador/conferência extra; a lista de assets da própria release ainda é autoritativa.
+            }
+        }
+
+        ReleaseAsset? installer = SelectInstaller(candidate.Assets);
+        if (installer is null || !Uri.TryCreate(installer.Url, UriKind.Absolute, out Uri? installerUrl))
+            throw new InvalidDataException(
+                $"A release {candidate.Tag} existe, mas não contém um instalador reconhecível do NITH Converter.");
+
+        Uri? checksumUri = FindChecksumUri(candidate.Assets, installer.Name);
+        return new UpdateRelease(candidate.Version, candidate.Tag, candidate.Title, installer.Name,
+            installerUrl, checksumUri, installer.Sha256, installer.Size, candidate.ReleasePageUri);
+    }
+
+    private async Task<UpdateRelease?> TryGetLatestReleaseWithoutApiAsync(CancellationToken cancellationToken)
+    {
+        Uri latestPage = new($"https://github.com/{Escape(_owner)}/{Escape(_repository)}/releases/latest");
+        using HttpResponseMessage pageResponse = await GetAsync(latestPage, cancellationToken).ConfigureAwait(false);
+        if (pageResponse.StatusCode == HttpStatusCode.NotFound) return null;
+        pageResponse.EnsureSuccessStatusCode();
+
+        Uri finalUri = pageResponse.RequestMessage?.RequestUri ?? latestPage;
+        string? tag = ExtractTagFromReleaseUri(finalUri);
+        if (string.IsNullOrWhiteSpace(tag) || !TryParseVersion(tag, out Version? version) || version is null)
+            return null;
+
+        Uri releasePage = new($"https://github.com/{Escape(_owner)}/{Escape(_repository)}/releases/tag/{Escape(tag)}");
+        Uri manifestUri = BuildAssetUri(tag, ManifestAssetName);
+        try
+        {
+            UpdateManifest? manifest = await TryReadManifestAsync(manifestUri, cancellationToken).ConfigureAwait(false);
+            if (manifest is not null && manifest.Version == version)
+            {
+                return new UpdateRelease(version, tag, manifest.Title, manifest.InstallerFileName,
+                    BuildAssetUri(tag, manifest.InstallerFileName), null, manifest.Sha256, manifest.Size, releasePage);
+            }
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or JsonException)
         {
-            // Releases antigas podem não ter o manifesto; a API REST continua sendo um fallback compatível.
-            manifestFailure = ex;
+            // Continua procurando nomes conhecidos para releases antigas.
         }
 
-        try
+        foreach (string installerName in KnownInstallerNames)
         {
-            return await CheckApiAsync(currentVersion, cancellationToken).ConfigureAwait(false);
+            Uri installerUri = BuildAssetUri(tag, installerName);
+            AssetProbe? probe = await ProbeAssetAsync(installerUri, cancellationToken).ConfigureAwait(false);
+            if (probe is null) continue;
+
+            Uri checksumUri = BuildAssetUri(tag, installerName + ".sha256");
+            AssetProbe? checksum = await ProbeAssetAsync(checksumUri, cancellationToken).ConfigureAwait(false);
+            return new UpdateRelease(version, tag, $"NITH Converter {FormatVersion(version)}", installerName,
+                installerUri, checksum is null ? null : checksumUri, null, probe.Size, releasePage);
         }
-        catch (HttpRequestException apiFailure) when (manifestFailure is not null)
-        {
-            throw new HttpRequestException(
-                "O GitHub não respondeu à consulta de atualização pelo manifesto nem pela API.",
-                new AggregateException(manifestFailure, apiFailure),
-                apiFailure.StatusCode);
-        }
-    }
 
-    private async Task<(bool Found, UpdateRelease? Release)> TryCheckManifestAsync(
-        Version currentVersion, CancellationToken cancellationToken)
-    {
-        Uri manifestUri = new($"https://github.com/{Uri.EscapeDataString(_owner)}/{Uri.EscapeDataString(_repository)}/releases/latest/download/{ManifestAssetName}");
-        using HttpResponseMessage response = await _http.GetAsync(manifestUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-
-        if (response.StatusCode == HttpStatusCode.NotFound)
-            return (false, null);
-
-        response.EnsureSuccessStatusCode();
-        await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        using JsonDocument json = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
-        JsonElement root = json.RootElement;
-
-        string versionText = RequiredString(root, "version");
-        string tag = RequiredString(root, "tag");
-        string installerName = RequiredString(root, "installer");
-        string expectedHash = RequiredString(root, "sha256").Trim();
-        string title = OptionalString(root, "title") ?? $"NITH Converter {versionText}";
-
-        if (!TryParseVersion(versionText, out Version? remoteVersion) || remoteVersion is null)
-            throw new InvalidDataException("O manifesto de atualização contém uma versão inválida.");
-        if (!IsSha256(expectedHash))
-            throw new InvalidDataException("O manifesto de atualização contém um SHA-256 inválido.");
-
-        if (remoteVersion <= Normalize(currentVersion))
-            return (true, null);
-
-        string tagSegment = Uri.EscapeDataString(tag);
-        string assetSegment = Uri.EscapeDataString(installerName);
-        var installerUri = new Uri($"https://github.com/{Uri.EscapeDataString(_owner)}/{Uri.EscapeDataString(_repository)}/releases/download/{tagSegment}/{assetSegment}");
-        var releasePage = new Uri($"https://github.com/{Uri.EscapeDataString(_owner)}/{Uri.EscapeDataString(_repository)}/releases/tag/{tagSegment}");
-        long size = root.TryGetProperty("size", out JsonElement sizeElement) && sizeElement.TryGetInt64(out long parsedSize) ? parsedSize : 0;
-
-        return (true, new UpdateRelease(remoteVersion, tag, title, installerName, installerUri,
-            null, expectedHash.ToUpperInvariant(), size, releasePage));
-    }
-
-    private async Task<UpdateRelease?> CheckApiAsync(Version currentVersion, CancellationToken cancellationToken)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Get,
-            $"https://api.github.com/repos/{Uri.EscapeDataString(_owner)}/{Uri.EscapeDataString(_repository)}/releases/latest");
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-        request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
-        using HttpResponseMessage response = await _http.SendAsync(
-            request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-
-        if (response.StatusCode == HttpStatusCode.NotFound)
-            return null;
-
-        response.EnsureSuccessStatusCode();
-        await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        using JsonDocument json = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
-        JsonElement root = json.RootElement;
-
-        string tag = root.GetProperty("tag_name").GetString() ?? string.Empty;
-        if (!TryParseVersion(tag, out Version? remoteVersion) || remoteVersion is null || remoteVersion <= Normalize(currentVersion))
-            return null;
-
-        string title = root.TryGetProperty("name", out JsonElement nameElement) && !string.IsNullOrWhiteSpace(nameElement.GetString())
-            ? nameElement.GetString()!
-            : $"NITH Converter {tag}";
-        string releasePage = root.GetProperty("html_url").GetString() ?? $"https://github.com/{_owner}/{_repository}/releases";
-
-        var assetList = root.GetProperty("assets").EnumerateArray().Select(asset => new ReleaseAsset(
-            asset.GetProperty("name").GetString() ?? string.Empty,
-            asset.GetProperty("browser_download_url").GetString() ?? string.Empty,
-            asset.TryGetProperty("size", out JsonElement size) ? size.GetInt64() : 0)).ToArray();
-
-        ReleaseAsset? installer = assetList.FirstOrDefault(asset =>
-            asset.Name.Equals("NITH Converter.exe", StringComparison.OrdinalIgnoreCase));
-        installer ??= assetList.FirstOrDefault(asset =>
-            asset.Name.StartsWith("NITHConverter-Setup-x64-", StringComparison.OrdinalIgnoreCase) &&
-            asset.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
-        installer ??= assetList.FirstOrDefault(asset =>
-            asset.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) &&
-            asset.Name.Contains("NITH", StringComparison.OrdinalIgnoreCase));
-
-        if (installer is null || string.IsNullOrWhiteSpace(installer.Url))
-            throw new InvalidDataException("A release mais recente não contém o instalador do NITH Converter.");
-
-        ReleaseAsset? checksum = assetList.FirstOrDefault(asset =>
-            asset.Name.Equals(installer.Name + ".sha256", StringComparison.OrdinalIgnoreCase));
-        if (checksum is null || string.IsNullOrWhiteSpace(checksum.Url))
-            throw new InvalidDataException("A release mais recente não contém o SHA-256 do instalador.");
-
-        return new UpdateRelease(remoteVersion, tag, title, installer.Name, new Uri(installer.Url),
-            new Uri(checksum.Url), null, installer.Size, new Uri(releasePage));
+        throw new InvalidDataException($"A release {tag} foi encontrada, mas o instalador não pôde ser localizado.");
     }
 
     public async Task<DownloadedUpdate> DownloadAsync(UpdateRelease release,
@@ -167,19 +266,23 @@ public sealed class GitHubUpdateService
     {
         string updatesDirectory = Path.Combine(StoragePaths.DataDirectory, "Updates");
         Directory.CreateDirectory(updatesDirectory);
-        string installerPath = Path.Combine(updatesDirectory, release.InstallerFileName);
+        string installerPath = Path.Combine(updatesDirectory, SanitizeFileName(release.InstallerFileName));
         string temporaryPath = installerPath + ".download";
 
-        string expectedHash = release.ExpectedSha256 ??
-            await ReadExpectedHashAsync(release.ChecksumUri ?? throw new InvalidDataException("SHA-256 da atualização não informado."), cancellationToken).ConfigureAwait(false);
+        string? expectedHash = release.ExpectedSha256;
+        if (expectedHash is null && release.ChecksumUri is not null)
+            expectedHash = await ReadExpectedHashAsync(release.ChecksumUri, cancellationToken).ConfigureAwait(false);
 
         if (File.Exists(installerPath))
         {
-            string cachedHash = await ComputeSha256Async(installerPath, cancellationToken).ConfigureAwait(false);
-            if (cachedHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
+            if (expectedHash is not null)
             {
-                progress?.Report(100);
-                return new DownloadedUpdate(release, installerPath);
+                string cachedHash = await ComputeSha256Async(installerPath, cancellationToken).ConfigureAwait(false);
+                if (cachedHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    progress?.Report(100);
+                    return new DownloadedUpdate(release, installerPath, IntegrityVerified: true);
+                }
             }
             TryDelete(installerPath);
         }
@@ -192,8 +295,7 @@ public sealed class GitHubUpdateService
 
         try
         {
-            using HttpResponseMessage response = await _http.GetAsync(release.InstallerUri,
-                HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            using HttpResponseMessage response = await GetAsync(release.InstallerUri, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             long? total = response.Content.Headers.ContentLength ?? (release.InstallerSize > 0 ? release.InstallerSize : null);
             await using Stream input = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
@@ -211,13 +313,18 @@ public sealed class GitHubUpdateService
             }
             await output.FlushAsync(cancellationToken).ConfigureAwait(false);
 
-            string actualHash = await ComputeSha256Async(temporaryPath, cancellationToken).ConfigureAwait(false);
-            if (!actualHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("A verificação SHA-256 da atualização falhou.");
+            bool verified = false;
+            if (expectedHash is not null)
+            {
+                string actualHash = await ComputeSha256Async(temporaryPath, cancellationToken).ConfigureAwait(false);
+                if (!actualHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("A verificação SHA-256 da atualização falhou. O instalador foi descartado.");
+                verified = true;
+            }
 
             File.Move(temporaryPath, installerPath, overwrite: true);
             progress?.Report(100);
-            return new DownloadedUpdate(release, installerPath);
+            return new DownloadedUpdate(release, installerPath, verified);
         }
         catch
         {
@@ -226,9 +333,69 @@ public sealed class GitHubUpdateService
         }
     }
 
+    private async Task<UpdateManifest?> TryReadManifestAsync(Uri manifestUri, CancellationToken cancellationToken)
+    {
+        using HttpResponseMessage response = await GetAsync(manifestUri, cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        response.EnsureSuccessStatusCode();
+
+        await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using JsonDocument json = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+        JsonElement root = json.RootElement;
+
+        string versionText = RequiredString(root, "version");
+        string tag = RequiredString(root, "tag");
+        string installer = RequiredString(root, "installer");
+        string title = OptionalString(root, "title") ?? $"NITH Converter {versionText}";
+        string? hash = OptionalString(root, "sha256")?.Trim();
+        long size = root.TryGetProperty("size", out JsonElement sizeElement) && sizeElement.TryGetInt64(out long parsedSize)
+            ? parsedSize : 0;
+
+        if (!TryParseVersion(versionText, out Version? version) || version is null)
+            throw new InvalidDataException("O manifesto de atualização contém uma versão inválida.");
+        if (!TryParseVersion(tag, out Version? tagVersion) || tagVersion is null || tagVersion != version)
+            throw new InvalidDataException("A tag e a versão do manifesto de atualização não correspondem.");
+        if (hash is not null && !IsSha256(hash))
+            throw new InvalidDataException("O manifesto de atualização contém um SHA-256 inválido.");
+        if (!installer.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || Path.GetFileName(installer) != installer)
+            throw new InvalidDataException("O nome do instalador no manifesto é inválido.");
+
+        return new UpdateManifest(version, tag, title, installer,
+            hash?.ToUpperInvariant(), size);
+    }
+
+    private async Task<AssetProbe?> ProbeAssetAsync(Uri uri, CancellationToken cancellationToken)
+    {
+        using HttpResponseMessage response = await GetAsync(uri, cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        if (!response.IsSuccessStatusCode) return null;
+        return new AssetProbe(response.Content.Headers.ContentLength ?? 0);
+    }
+
+    private async Task<HttpResponseMessage> GetAsync(Uri uri, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true };
+        return await SendAsync(request, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new HttpRequestException("A consulta ao GitHub excedeu o tempo limite.", ex);
+        }
+    }
+
     private async Task<string> ReadExpectedHashAsync(Uri checksumUri, CancellationToken token)
     {
-        string text = await _http.GetStringAsync(checksumUri, token).ConfigureAwait(false);
+        using HttpResponseMessage response = await GetAsync(checksumUri, token).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        string text = await response.Content.ReadAsStringAsync(token).ConfigureAwait(false);
         string tokenValue = text.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
         if (!IsSha256(tokenValue))
             throw new InvalidDataException("O arquivo SHA-256 publicado na release é inválido.");
@@ -241,6 +408,53 @@ public sealed class GitHubUpdateService
             128 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
         byte[] hash = await SHA256.HashDataAsync(stream, token).ConfigureAwait(false);
         return Convert.ToHexString(hash);
+    }
+
+    private static ReleaseAsset? SelectInstaller(IReadOnlyList<ReleaseAsset> assets) => assets
+        .Where(asset => asset.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        .Where(asset => !asset.Name.Contains("unins", StringComparison.OrdinalIgnoreCase))
+        .Where(asset => !string.IsNullOrWhiteSpace(asset.Url))
+        .OrderBy(InstallerScore)
+        .FirstOrDefault(asset => InstallerScore(asset) < 1000);
+
+    private static int InstallerScore(ReleaseAsset asset)
+    {
+        for (int i = 0; i < KnownInstallerNames.Length; i++)
+            if (asset.Name.Equals(KnownInstallerNames[i], StringComparison.OrdinalIgnoreCase)) return i;
+        if (asset.Name.StartsWith("NITHConverter-Setup-x64-", StringComparison.OrdinalIgnoreCase)) return 10;
+        if (asset.Name.Contains("NITH", StringComparison.OrdinalIgnoreCase) &&
+            asset.Name.Contains("Converter", StringComparison.OrdinalIgnoreCase)) return 20;
+        return 1000;
+    }
+
+    private static Uri? FindChecksumUri(IReadOnlyList<ReleaseAsset> assets, string installerName)
+    {
+        ReleaseAsset? checksum = assets.FirstOrDefault(asset =>
+            asset.Name.Equals(installerName + ".sha256", StringComparison.OrdinalIgnoreCase) &&
+            Uri.TryCreate(asset.Url, UriKind.Absolute, out _));
+        return checksum is null ? null : new Uri(checksum.Url);
+    }
+
+    private Uri BuildAssetUri(string tag, string assetName) => new(
+        $"https://github.com/{Escape(_owner)}/{Escape(_repository)}/releases/download/{Escape(tag)}/{Escape(assetName)}");
+
+    private static string? ExtractTagFromReleaseUri(Uri uri)
+    {
+        string[] segments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i + 1 < segments.Length; i++)
+        {
+            if (segments[i].Equals("tag", StringComparison.OrdinalIgnoreCase))
+                return Uri.UnescapeDataString(segments[i + 1]);
+        }
+        return null;
+    }
+
+    private static string? ParseSha256Digest(string? digest)
+    {
+        if (string.IsNullOrWhiteSpace(digest)) return null;
+        const string prefix = "sha256:";
+        string value = digest.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ? digest[prefix.Length..] : digest;
+        return IsSha256(value) ? value.ToUpperInvariant() : null;
     }
 
     private static bool TryParseVersion(string value, out Version? version)
@@ -257,6 +471,9 @@ public sealed class GitHubUpdateService
         Math.Max(0, version.Major), Math.Max(0, version.Minor),
         Math.Max(0, version.Build), Math.Max(0, version.Revision));
 
+    private static string FormatVersion(Version version) =>
+        $"{version.Major}.{version.Minor}.{Math.Max(0, version.Build)}";
+
     private static string RequiredString(JsonElement root, string name)
     {
         if (!root.TryGetProperty(name, out JsonElement element) || element.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(element.GetString()))
@@ -269,8 +486,30 @@ public sealed class GitHubUpdateService
             ? element.GetString()
             : null;
 
-    private static bool IsSha256(string value) =>
-        value.Length == 64 && value.All(Uri.IsHexDigit);
+    private static bool IsSha256(string value) => value.Length == 64 && value.All(Uri.IsHexDigit);
+
+    private static bool IsRecoverableCheckFailure(Exception ex) =>
+        ex is HttpRequestException or IOException or InvalidDataException or JsonException or TaskCanceledException;
+
+    private static HttpRequestException CreateRateLimitException(HttpResponseMessage response)
+    {
+        string? remaining = response.Headers.TryGetValues("X-RateLimit-Remaining", out IEnumerable<string>? values)
+            ? values.FirstOrDefault() : null;
+        string message = remaining == "0"
+            ? "O limite público de consultas do GitHub foi atingido temporariamente."
+            : "O GitHub recusou temporariamente a consulta pública de releases.";
+        return new HttpRequestException(message, null, response.StatusCode);
+    }
+
+    private static string SanitizeFileName(string value)
+    {
+        string name = Path.GetFileName(value);
+        foreach (char invalid in Path.GetInvalidFileNameChars())
+            name = name.Replace(invalid, '_');
+        return string.IsNullOrWhiteSpace(name) ? "NITH.Converter.exe" : name;
+    }
+
+    private static string Escape(string value) => Uri.EscapeDataString(value);
 
     private static void TryDelete(string path)
     {
@@ -278,5 +517,8 @@ public sealed class GitHubUpdateService
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
-    private sealed record ReleaseAsset(string Name, string Url, long Size);
+    private sealed record ReleaseAsset(string Name, string Url, long Size, string? Sha256);
+    private sealed record ApiRelease(Version Version, string Tag, string Title, Uri ReleasePageUri, IReadOnlyList<ReleaseAsset> Assets);
+    private sealed record UpdateManifest(Version Version, string Tag, string Title, string InstallerFileName, string? Sha256, long Size);
+    private sealed record AssetProbe(long Size);
 }

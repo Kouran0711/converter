@@ -1,0 +1,13 @@
+NITH Converter 1.5.2
+
+CORREÇÃO DO ATUALIZADOR
+
+- A versão mais recente é escolhida pela maior tag semântica entre as releases estáveis do GitHub.
+- O app não depende mais somente de /releases/latest para decidir que está atualizado.
+- NITH.Converter.exe é reconhecido como instalador oficial.
+- SHA-256 pode vir do manifesto, do .sha256 ou do digest do asset no GitHub.
+- O workflow força a nova release como Latest e valida os assets.
+- O build falha se a versão gravada no executável não bater com a versão informada no workflow.
+- A interface mostra “Instalada” e “Mais recente no GitHub” para facilitar diagnóstico.
+
+Para publicar: execute o workflow manual com a versão 1.5.2.

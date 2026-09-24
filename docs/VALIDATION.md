@@ -13,7 +13,9 @@ Confirme que existem:
 
 ```text
 artifacts/publish/win-x64/NITHConverter.exe
-artifacts/installer/NITH Converter.exe
+artifacts/installer/NITH.Converter.exe
+artifacts/installer/NITH.Converter.exe.sha256
+artifacts/installer/nith-update.json
 ```
 
 ## Interface
@@ -53,7 +55,7 @@ Os formatos avançados devem ser testados com o build exato do ImageMagick/FFmpe
 1. Instale a versão `vX.Y.Z`.
 2. Publique `vX.Y.(Z+1)`.
 3. Abra a versão antiga.
-4. Confirme detecção da release.
+4. Confirme que a tela mostra a versão instalada e a maior versão estável publicada.
 5. Confirme download automático e validação SHA-256.
 6. Clique **Instalar agora**.
 7. Aceite UAC.

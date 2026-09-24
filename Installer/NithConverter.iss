@@ -1,6 +1,6 @@
 ; Build with scripts/Publish.ps1 -Installer, using Inno Setup 6.3 or later.
 #ifndef AppVersion
-  #define AppVersion "1.3.1"
+  #define AppVersion "1.5.2"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\publish\win-x64"
@@ -30,7 +30,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.19041
 OutputDir=..\artifacts\installer
-OutputBaseFilename=NITH Converter
+OutputBaseFilename=NITH.Converter
 SetupIconFile={#PublishDir}\Assets\Brand\NithConverter.ico
 UninstallDisplayIcon={app}\{#BrandIcon}
 Compression=lzma2

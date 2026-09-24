@@ -9,6 +9,13 @@ public sealed record UpdateRelease(
     Uri? ChecksumUri,
     string? ExpectedSha256,
     long InstallerSize,
-    Uri ReleasePageUri);
+    Uri ReleasePageUri)
+{
+    public bool HasIntegrityVerification =>
+        !string.IsNullOrWhiteSpace(ExpectedSha256) || ChecksumUri is not null;
+}
 
-public sealed record DownloadedUpdate(UpdateRelease Release, string InstallerPath);
+public sealed record DownloadedUpdate(
+    UpdateRelease Release,
+    string InstallerPath,
+    bool IntegrityVerified = false);
