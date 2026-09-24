@@ -13,8 +13,13 @@ public sealed class FFmpegService
     {
         options ??= new();
         double? duration = await GetDurationAsync(probeExecutable, inputPath, cancellationToken).ConfigureAwait(false);
-        Report(progress, new(null, "Convertendo vídeo…"));
         string threads = Math.Clamp(Environment.ProcessorCount / 2, 1, 4).ToString(CultureInfo.InvariantCulture);
+
+        if (FormatCatalog.IsAudioOutput(formatId))
+            return await ConvertAudioAsync(executable, inputPath, outputPath, formatId, progress,
+                cancellationToken, options, duration, threads).ConfigureAwait(false);
+
+        Report(progress, new(null, "Convertendo vídeo…"));
         var arguments = new List<string>
         {
             "-hide_banner", "-loglevel", "error", "-nostdin", "-nostats", "-y",
@@ -32,29 +37,85 @@ public sealed class FFmpegService
         switch (formatId)
         {
             case "GIF":
-                // Single-frame palettes stream through FFmpeg: no full-video palette buffering.
                 arguments.AddRange(["-an", "-vf",
                     string.Join(',', filters) + $",split[a][b];[a]palettegen=stats_mode=single:max_colors={options.GifColors}[p];[b][p]paletteuse=new=1:dither=bayer",
                     "-loop", "0"]);
                 break;
             case "MP4":
-                // Native MPEG-4/AAC avoid requiring a GPL-enabled libx264 distribution.
                 string quantizer = options.VideoQuality switch { VideoQuality.Compact => "8", VideoQuality.High => "2", _ => "3" };
                 arguments.AddRange(["-vf", string.Join(',', filters),
                     "-c:v", "mpeg4", "-q:v", quantizer, "-pix_fmt", "yuv420p", "-c:a", "aac",
-                    "-b:a", $"{options.AudioBitrateKbps}k", "-movflags", "+faststart"]);
+                    "-b:a", $"{options.AudioBitrateKbps}k", "-ar", options.AudioSampleRateHz.ToString(CultureInfo.InvariantCulture),
+                    "-ac", options.AudioChannels.ToString(CultureInfo.InvariantCulture), "-movflags", "+faststart"]);
                 break;
             case "WEBM":
                 string crf = options.VideoQuality switch { VideoQuality.Compact => "40", VideoQuality.High => "24", _ => "32" };
                 arguments.AddRange(["-vf", string.Join(',', filters), "-c:v", "libvpx-vp9", "-crf", crf,
                     "-b:v", "0", "-deadline", "good", "-cpu-used", "5", "-row-mt", "1",
-                    "-c:a", "libopus", "-b:a", $"{options.AudioBitrateKbps}k"]);
+                    "-c:a", "libopus", "-b:a", $"{options.AudioBitrateKbps}k",
+                    "-ar", options.AudioSampleRateHz.ToString(CultureInfo.InvariantCulture),
+                    "-ac", options.AudioChannels.ToString(CultureInfo.InvariantCulture)]);
                 break;
             default: throw new ArgumentException("Formato de vídeo não suportado.", nameof(formatId));
         }
         if (formatId != "GIF")
             arguments.AddRange(options.KeepAudio ? ["-map", "0:a:0?"] : ["-an"]);
         arguments.Add(outputPath);
+        return await RunWithProgressAsync(executable, arguments, progress, cancellationToken, duration, "Convertendo vídeo…").ConfigureAwait(false);
+    }
+
+    private static async Task<ProcessExecutionResult> ConvertAudioAsync(string executable, string inputPath,
+        string outputPath, string formatId, IProgress<ConversionProgress>? progress, CancellationToken cancellationToken,
+        ConversionOptions options, double? duration, string threads)
+    {
+        Report(progress, new(null, "Convertendo áudio…"));
+        var arguments = new List<string>
+        {
+            "-hide_banner", "-loglevel", "error", "-nostdin", "-nostats", "-y",
+            "-threads", threads, "-i", inputPath,
+            "-progress", "pipe:1", "-stats_period", "0.4",
+            "-map", "0:a:0", "-vn",
+            "-ar", options.AudioSampleRateHz.ToString(CultureInfo.InvariantCulture),
+            "-ac", options.AudioChannels.ToString(CultureInfo.InvariantCulture)
+        };
+
+        switch (formatId)
+        {
+            case "MP3":
+                arguments.AddRange(["-c:a", "libmp3lame", "-b:a", $"{options.AudioBitrateKbps}k"]);
+                break;
+            case "WAV":
+                arguments.AddRange(["-c:a", "pcm_s16le"]);
+                break;
+            case "FLAC":
+                arguments.AddRange(["-c:a", "flac", "-compression_level", "8"]);
+                break;
+            case "AAC":
+                arguments.AddRange(["-c:a", "aac", "-b:a", $"{options.AudioBitrateKbps}k"]);
+                break;
+            case "M4A":
+                arguments.AddRange(["-c:a", "aac", "-b:a", $"{options.AudioBitrateKbps}k", "-movflags", "+faststart"]);
+                break;
+            case "OGG":
+                arguments.AddRange(["-c:a", "libvorbis", "-b:a", $"{options.AudioBitrateKbps}k"]);
+                break;
+            case "OPUS":
+                arguments.AddRange(["-c:a", "libopus", "-b:a", $"{options.AudioBitrateKbps}k"]);
+                break;
+            case "WMA":
+                arguments.AddRange(["-c:a", "wmav2", "-b:a", $"{options.AudioBitrateKbps}k"]);
+                break;
+            default:
+                throw new ArgumentException("Formato de áudio não suportado.", nameof(formatId));
+        }
+
+        arguments.Add(outputPath);
+        return await RunWithProgressAsync(executable, arguments, progress, cancellationToken, duration, "Convertendo áudio…").ConfigureAwait(false);
+    }
+
+    private static async Task<ProcessExecutionResult> RunWithProgressAsync(string executable, IReadOnlyList<string> arguments,
+        IProgress<ConversionProgress>? progress, CancellationToken cancellationToken, double? duration, string message)
+    {
         long lastUpdate = 0;
         return await ProcessHelper.RunAsync(executable, arguments, cancellationToken, line =>
         {
@@ -63,9 +124,8 @@ public sealed class FFmpegService
             long now = Stopwatch.GetTimestamp();
             if (Stopwatch.GetElapsedTime(lastUpdate, now).TotalMilliseconds < 250) return;
             lastUpdate = now;
-            // Duration metadata can be imperfect. 100% is reserved for successful final commit.
             double percent = Math.Clamp(microseconds / 1_000_000d / duration.Value * 100d, 0d, 99.9d);
-            Report(progress, new(percent, "Convertendo vídeo…"));
+            Report(progress, new(percent, message));
         }).ConfigureAwait(false);
     }
 
@@ -89,7 +149,6 @@ public sealed class FFmpegService
 
     internal static void Report(IProgress<ConversionProgress>? progress, ConversionProgress value)
     {
-        // A UI observer cannot interrupt pipe draining or strand the external encoder.
         try { progress?.Report(value); } catch (Exception) { }
     }
 }

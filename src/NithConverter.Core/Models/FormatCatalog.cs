@@ -12,9 +12,13 @@ public static class FormatCatalog
     ]);
     private static readonly IReadOnlyList<OutputFormat> VideoOutputs = Array.AsReadOnly<OutputFormat>(
     [new("GIF", "GIF", ".gif"), new("MP4", "MP4", ".mp4"), new("WEBM", "WEBM", ".webm")]);
+    private static readonly IReadOnlyList<OutputFormat> AudioOutputs = Array.AsReadOnly<OutputFormat>(
+    [
+        new("MP3", "MP3", ".mp3"), new("WAV", "WAV", ".wav"), new("FLAC", "FLAC", ".flac"),
+        new("AAC", "AAC", ".aac"), new("M4A", "M4A", ".m4a"), new("OGG", "OGG Vorbis", ".ogg"),
+        new("OPUS", "Opus", ".opus"), new("WMA", "WMA", ".wma")
+    ]);
 
-    // Formatos comuns aceitos pelas distribuições atuais do ImageMagick. Alguns dependem
-    // dos delegates presentes na instalação local (HEIC/AVIF/SVG/PSD etc.).
     private static readonly HashSet<string> Images = new(StringComparer.OrdinalIgnoreCase)
     {
         ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif", ".gif", ".ico", ".tga",
@@ -28,9 +32,14 @@ public static class FormatCatalog
         ".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v", ".wmv", ".flv", ".mpeg", ".mpg",
         ".ts", ".mts", ".m2ts", ".3gp", ".ogv"
     };
+    private static readonly HashSet<string> Audios = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mp3", ".wav", ".flac", ".aac", ".m4a", ".ogg", ".opus", ".wma", ".aiff", ".aif",
+        ".ac3", ".eac3", ".mka", ".ape", ".alac", ".amr"
+    };
 
     public static IReadOnlyList<string> SupportedExtensions { get; } =
-        Array.AsReadOnly(Images.Concat(Documents).Concat(Videos).Order().ToArray());
+        Array.AsReadOnly(Images.Concat(Documents).Concat(Videos).Concat(Audios).Order().ToArray());
 
     public static bool IsSupportedInput(string path) => GetInputKind(path) is not null;
 
@@ -39,18 +48,23 @@ public static class FormatCatalog
         string extension = Path.GetExtension(path);
         if (Images.Contains(extension)) return MediaKind.Image;
         if (Videos.Contains(extension)) return MediaKind.Video;
+        if (Audios.Contains(extension)) return MediaKind.Audio;
         return Documents.Contains(extension) ? MediaKind.Document : null;
     }
 
     public static bool IsPagedDocument(string path) => Documents.Contains(Path.GetExtension(path));
+    public static bool IsAudioOutput(string? id) => id is not null && AudioOutputs.Any(x => x.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+    public static bool IsVideoOutput(string? id) => id is not null && VideoOutputs.Any(x => x.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
 
     public static IReadOnlyList<OutputFormat> GetOutputFormats(string inputPath) => GetInputKind(inputPath) switch
     {
         MediaKind.Image or MediaKind.Document => ImageOutputs,
-        MediaKind.Video => VideoOutputs,
+        // Vídeos também podem ter a faixa de áudio extraída diretamente.
+        MediaKind.Video => Array.AsReadOnly(VideoOutputs.Concat(AudioOutputs).ToArray()),
+        MediaKind.Audio => AudioOutputs,
         _ => Array.Empty<OutputFormat>()
     };
 
-    public static OutputFormat? FindOutputFormat(string id) => ImageOutputs.Concat(VideoOutputs)
+    public static OutputFormat? FindOutputFormat(string id) => ImageOutputs.Concat(VideoOutputs).Concat(AudioOutputs)
         .FirstOrDefault(format => format.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
 }

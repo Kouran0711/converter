@@ -60,9 +60,9 @@ public sealed class ConversionService(DependencyService dependencies, HistorySer
                 return Failure(ConversionError.OutputExists, "Esse arquivo já existe. Confirme a substituição ou escolha outro destino.");
 
             DependencySnapshot installed = await dependencies.DiscoverAsync(cancellationToken: token).ConfigureAwait(false);
-            if (kind == MediaKind.Video && installed.FFmpegPath is null)
+            if ((kind is MediaKind.Video or MediaKind.Audio) && installed.FFmpegPath is null)
                 return Failure(ConversionError.DependencyMissing, "O FFmpeg não foi encontrado. Verifique as dependências nas configurações.");
-            if (kind != MediaKind.Video && installed.ImageMagickPath is null)
+            if ((kind is MediaKind.Image or MediaKind.Document) && installed.ImageMagickPath is null)
                 return Failure(ConversionError.DependencyMissing, "O ImageMagick não foi encontrado. Verifique as dependências nas configurações.");
             if (kind == MediaKind.Document && installed.GhostscriptPath is null)
                 return Failure(ConversionError.DependencyMissing,
@@ -101,7 +101,8 @@ public sealed class ConversionService(DependencyService dependencies, HistorySer
             token.ThrowIfCancellationRequested();
             await logger.WriteAsync("conversion.started", $"{kind}:{format.Id}").ConfigureAwait(false);
             FFmpegService.Report(progress, new(null, "Convertendo…"));
-            ProcessExecutionResult execution = kind == MediaKind.Video
+            bool useFfmpeg = kind is MediaKind.Video or MediaKind.Audio;
+            ProcessExecutionResult execution = useFfmpeg
                 ? await _videos.ConvertAsync(installed.FFmpegPath!, installed.FFprobePath, engineInput,
                     engineOutput, format.Id, progress, token, options).ConfigureAwait(false)
                 : await _images.ConvertAsync(installed.ImageMagickPath!, engineInput, engineOutput,

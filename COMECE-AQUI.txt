@@ -7,9 +7,9 @@ NITH CONVERTER - COMEÇE AQUI
 2) Confirme que existe no GitHub:
    .github/workflows/release.yml
 
-3) Para criar a versão 1.1.0 SEM usar terminal:
+3) Para criar a versão 1.2.0 SEM usar terminal:
    GitHub > Actions > Build e publicar release > Run workflow
-   Version: 1.1.0
+   Version: 1.2.0
    Clique em Run workflow.
 
 4) O workflow vai:
@@ -18,12 +18,12 @@ NITH CONVERTER - COMEÇE AQUI
    - gerar o instalador com Inno Setup;
    - gerar o ZIP portátil;
    - criar SHA-256;
-   - criar/atualizar a Release v1.1.0.
+   - criar/atualizar a Release v1.2.0.
 
 5) Depois abra GitHub > Releases e baixe:
-   NITHConverter-Setup-x64-1.1.0.0.exe
+   NITHConverter-Setup-x64-1.2.0.0.exe
 
-6) Nas próximas versões use 1.1.1, 1.1.2, 1.2.0 etc.
+6) Nas próximas versões use 1.2.1, 1.1.2, 1.2.0 etc.
 
 Assinatura do projeto:
 Nith Digital - nithdigital.com.br

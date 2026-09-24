@@ -1,8 +1,13 @@
 # NITH Converter
 
-Conversor de arquivos para Windows feito para transformar imagens, documentos e vídeos de forma simples, com controle de qualidade, resolução, FPS, áudio e outros ajustes sem sair do aplicativo.
+Conversor de arquivos para Windows feito para transformar imagens, documentos, vídeos e áudios de forma simples, com controle de qualidade, resolução, FPS, bitrate, taxa de amostragem e outros ajustes sem sair do aplicativo.
 
 **Nith Digital - nithdigital.com.br**
+
+### Áudio
+- Converte MP3, WAV, FLAC, AAC, M4A, OGG, OPUS, WMA e outros formatos aceitos pelo FFmpeg.
+- Permite escolher bitrate, taxa de amostragem (22.05 a 96 kHz) e mono/estéreo.
+- Também extrai o áudio de vídeos diretamente para um formato de áudio.
 
 ## O que ele faz
 

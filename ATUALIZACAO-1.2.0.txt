@@ -1,0 +1,21 @@
+NITH Converter 1.2.0
+
+Novidades desta versão:
+- Conversão de áudio: MP3, WAV, FLAC, AAC, M4A, OGG, OPUS e WMA.
+- Entrada adicional: AIFF/AIF, AC3/EAC3, MKA, APE, ALAC e AMR (quando o FFmpeg instalado suportar).
+- Extração de áudio de vídeo: escolha MP3/WAV/FLAC/AAC/M4A/OGG/OPUS/WMA como saída para um vídeo.
+- Ajustes: bitrate, taxa de amostragem e mono/estéreo.
+- A versão mostrada na lateral do app é lida do próprio build.
+
+IMPORTANTE SOBRE A VERSÃO:
+Ao publicar pelo GitHub Actions e informar, por exemplo, 1.3.0, o workflow envia essa versão para o Publish.ps1.
+O Publish.ps1 grava Version, AssemblyVersion, FileVersion e InformationalVersion no build.
+Assim, a interface passará a mostrar automaticamente "Versão 1.3.0" sem precisar editar o XAML.
+
+Para publicar esta versão:
+1. Substitua os arquivos no repositório pelos arquivos deste pacote.
+2. git add -A
+3. git commit -m "NITH Converter 1.2.0 - suporte a audio"
+4. git push origin main
+5. GitHub > Actions > Build e publicar release > Run workflow
+6. Version: 1.2.0

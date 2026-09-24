@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0
+- Conversão de áudio adicionada: MP3, WAV, FLAC, AAC, M4A, OGG, OPUS e WMA.
+- Entrada de arquivos de áudio pelo seletor e arrastar/soltar.
+- Extração de áudio de arquivos de vídeo.
+- Ajustes de bitrate, taxa de amostragem e mono/estéreo.
+- A versão exibida na interface passa a acompanhar diretamente a versão usada no build/release.
+
 ## 1.1.0
 
 - Preparação completa para GitHub e GitHub Releases.

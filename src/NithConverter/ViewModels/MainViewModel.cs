@@ -119,11 +119,14 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public string PdfStatus { get => _pdfStatus; private set => Set(ref _pdfStatus, value); }
     public IReadOnlyList<OutputFormat> Formats { get => _formats; private set => Set(ref _formats, value); }
     public OutputFormat? SelectedFormat { get => _selectedFormat; set { if (Set(ref _selectedFormat, value)) { ConvertCommand.Notify(); Raise(nameof(ConversionHint)); Raise(nameof(OutputExtension)); Options.Configure(FormatCatalog.GetInputKind(_inputPath ?? ""), value?.Id); } } }
-    public string ConversionHint => FormatCatalog.GetInputKind(_inputPath ?? "") == MediaKind.Document
-        ? "Documento: a primeira página será convertida. PDF/PS/EPS exigem Ghostscript e permitem escolher o DPI nos ajustes."
-        : FormatCatalog.GetInputKind(_inputPath ?? "") == MediaKind.Video && SelectedFormat?.Id.Equals("gif", StringComparison.OrdinalIgnoreCase) == true
-            ? "GIF de vídeo: personalize FPS, largura e cores nos ajustes. O original é preservado."
-            : "O arquivo original é preservado. Imagens com várias páginas usam a primeira página/quadro.";
+    public string ConversionHint => FormatCatalog.GetInputKind(_inputPath ?? "") switch
+    {
+        MediaKind.Document => "Documento: a primeira página será convertida. PDF/PS/EPS exigem Ghostscript e permitem escolher o DPI nos ajustes.",
+        MediaKind.Audio => "Áudio: converta entre MP3, WAV, FLAC, AAC, M4A, OGG, OPUS e WMA com controle de bitrate, taxa e canais.",
+        MediaKind.Video when FormatCatalog.IsAudioOutput(SelectedFormat?.Id) => "Extração de áudio: o vídeo original é preservado e somente a faixa de áudio é convertida.",
+        MediaKind.Video when SelectedFormat?.Id.Equals("gif", StringComparison.OrdinalIgnoreCase) == true => "GIF de vídeo: personalize FPS, largura e cores nos ajustes. O original é preservado.",
+        _ => "O arquivo original é preservado. Imagens com várias páginas usam a primeira página/quadro."
+    };
     public bool IsBusy
     {
         get => _busy;
@@ -200,7 +203,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             ConvertCommand.Notify();
         }
         catch (OperationCanceledException) { }
-        catch (NotSupportedException) { Status = "Formato ainda não suportado"; StatusDetail = "Escolha uma imagem, documento ou vídeo compatível."; Severity = InfoBarSeverity.Warning; }
+        catch (NotSupportedException) { Status = "Formato ainda não suportado"; StatusDetail = "Escolha uma imagem, documento, vídeo ou áudio compatível."; Severity = InfoBarSeverity.Warning; }
         catch (Exception ex) { ReportError(ex); }
     }
     private Task StartConversionAsync() => _conversionTask = ConvertCoreAsync();

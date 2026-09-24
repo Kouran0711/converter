@@ -65,7 +65,7 @@
           <StackPanel Spacing="16">
             <Grid ColumnSpacing="18">
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-              <StackPanel Spacing="7">
+              <StackPanel Spacing="7" Visibility="{Binding Options.VisualResizeVisibility}">
                 <TextBlock Text="Resolução / largura máxima" FontWeight="SemiBold" FontSize="13"/>
                 <ComboBox ItemsSource="{Binding Options.WidthChoices}" SelectedItem="{Binding Options.SelectedWidth, Mode=TwoWay}" DisplayMemberPath="Label" HorizontalAlignment="Stretch" AutomationProperties.Name="Largura máxima" AutomationProperties.AutomationId="MaxWidthComboBox"/>
               </StackPanel>
@@ -98,12 +98,26 @@
               <StackPanel Spacing="7"><TextBlock Text="Quadros por segundo (FPS)" FontWeight="SemiBold" FontSize="13"/>
                 <ComboBox ItemsSource="{Binding Options.FpsChoices}" SelectedItem="{Binding Options.SelectedFps, Mode=TwoWay}" DisplayMemberPath="Label" HorizontalAlignment="Stretch" AutomationProperties.Name="Quadros por segundo" AutomationProperties.AutomationId="FpsComboBox"/>
               </StackPanel>
-              <ToggleSwitch Grid.Column="1" Header="Áudio" IsOn="{Binding Options.KeepAudio, Mode=TwoWay}" OnContent="Manter" OffContent="Remover" Visibility="{Binding Options.AudioVisibility}" AutomationProperties.AutomationId="KeepAudioToggle"/>
+              <ToggleSwitch Grid.Column="1" Header="Áudio" IsOn="{Binding Options.KeepAudio, Mode=TwoWay}" OnContent="Manter" OffContent="Remover" Visibility="{Binding Options.KeepAudioVisibility}" AutomationProperties.AutomationId="KeepAudioToggle"/>
             </Grid>
 
-            <StackPanel Spacing="7" Visibility="{Binding Options.AudioVisibility}">
-              <TextBlock Text="Qualidade do áudio" FontWeight="SemiBold" FontSize="13"/>
-              <ComboBox ItemsSource="{Binding Options.AudioBitrateChoices}" SelectedItem="{Binding Options.SelectedAudioBitrate, Mode=TwoWay}" DisplayMemberPath="Label" MaxWidth="420" HorizontalAlignment="Left" MinWidth="280" AutomationProperties.Name="Bitrate de áudio"/>
+            <StackPanel Spacing="12" Visibility="{Binding Options.AudioOptionsVisibility}">
+              <TextBlock Text="Ajustes de áudio" FontWeight="SemiBold" FontSize="13"/>
+              <Grid ColumnSpacing="18">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <StackPanel Spacing="7" Visibility="{Binding Options.AudioBitrateVisibility}">
+                  <TextBlock Text="Bitrate / qualidade" FontSize="12" Foreground="{StaticResource MutedForeground}"/>
+                  <ComboBox ItemsSource="{Binding Options.AudioBitrateChoices}" SelectedItem="{Binding Options.SelectedAudioBitrate, Mode=TwoWay}" DisplayMemberPath="Label" HorizontalAlignment="Stretch" AutomationProperties.Name="Bitrate de áudio"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Spacing="7">
+                  <TextBlock Text="Taxa de amostragem" FontSize="12" Foreground="{StaticResource MutedForeground}"/>
+                  <ComboBox ItemsSource="{Binding Options.AudioSampleRateChoices}" SelectedItem="{Binding Options.SelectedAudioSampleRate, Mode=TwoWay}" DisplayMemberPath="Label" HorizontalAlignment="Stretch" AutomationProperties.Name="Taxa de amostragem"/>
+                </StackPanel>
+              </Grid>
+              <StackPanel Spacing="7" MaxWidth="420" HorizontalAlignment="Left">
+                <TextBlock Text="Canais" FontSize="12" Foreground="{StaticResource MutedForeground}"/>
+                <ComboBox ItemsSource="{Binding Options.AudioChannelChoices}" SelectedItem="{Binding Options.SelectedAudioChannels, Mode=TwoWay}" DisplayMemberPath="Label" MinWidth="280" AutomationProperties.Name="Canais de áudio"/>
+              </StackPanel>
             </StackPanel>
 
             <Border Background="#101A23" CornerRadius="8" Padding="12">

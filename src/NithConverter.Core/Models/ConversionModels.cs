@@ -1,6 +1,6 @@
 namespace NithConverter.Core.Models;
 
-public enum MediaKind { Image, Document, Video }
+public enum MediaKind { Image, Document, Video, Audio }
 public enum ConversionError { None, Canceled, OutputExists, DependencyMissing, UnsupportedFormat, InvalidInput, Failed }
 
 public sealed record OutputFormat(string Id, string DisplayName, string Extension)
@@ -22,6 +22,7 @@ public sealed record DependencySnapshot(string? ImageMagickPath, string? FFmpegP
 {
     public bool ImagesAvailable => ImageMagickPath is not null;
     public bool VideosAvailable => FFmpegPath is not null;
+    public bool AudioAvailable => FFmpegPath is not null;
     public bool PdfReadingAvailable => ImageMagickPath is not null && GhostscriptPath is not null;
 }
 

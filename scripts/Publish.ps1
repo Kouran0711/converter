@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [ValidateSet('Release', 'Debug')][string]$Configuration = 'Release',
     [switch]$BundleDependencies,
@@ -57,7 +57,14 @@ try {
         '-p:WindowsAppSDKSelfContained=true', '-p:PublishSingleFile=false', '-p:PublishTrimmed=false',
         '-p:DebugType=None', '-p:DebugSymbols=false'
     )
-    if (-not [string]::IsNullOrWhiteSpace($Version)) { $publishArgs += "-p:Version=$Version" }
+    if (-not [string]::IsNullOrWhiteSpace($Version)) {
+        $parsedVersion = [Version]$Version
+        $assemblyVersion = '{0}.{1}.{2}.{3}' -f $parsedVersion.Major, $parsedVersion.Minor, ([Math]::Max(0, $parsedVersion.Build)), ([Math]::Max(0, $parsedVersion.Revision))
+        $publishArgs += "-p:Version=$Version"
+        $publishArgs += "-p:AssemblyVersion=$assemblyVersion"
+        $publishArgs += "-p:FileVersion=$assemblyVersion"
+        $publishArgs += "-p:InformationalVersion=$Version"
+    }
     & $dotnet @publishArgs
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish falhou (código $LASTEXITCODE)." }
 }
