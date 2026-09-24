@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "components": [
+    {
+      "name": "ImageMagick",
+      "version": "REPLACE_WITH_EXACT_VERSION",
+      "license": "ImageMagick",
+      "reviewed": false,
+      "executable": "bin/ImageMagick/magick.exe",
+      "licenseFiles": ["licenses/ImageMagick/LICENSE.txt"],
+      "files": [
+        { "path": "bin/ImageMagick/magick.exe", "sha256": "REPLACE_WITH_SHA256" },
+        { "path": "licenses/ImageMagick/LICENSE.txt", "sha256": "REPLACE_WITH_SHA256" }
+      ]
+    },
+    {
+      "name": "FFmpeg",
+      "version": "REPLACE_WITH_EXACT_VERSION_AND_BUILD",
+      "license": "LGPL-2.1-or-later",
+      "reviewed": false,
+      "executable": "bin/FFmpeg/ffmpeg.exe",
+      "licenseFiles": ["licenses/FFmpeg/COPYING.LGPLv2.1"],
+      "correspondingSourceFile": "licenses/FFmpeg/corresponding-source.tar.xz",
+      "buildConfigurationFile": "licenses/FFmpeg/build-configuration.txt",
+      "files": [
+        { "path": "bin/FFmpeg/ffmpeg.exe", "sha256": "REPLACE_WITH_SHA256" },
+        { "path": "bin/FFmpeg/ffprobe.exe", "sha256": "REPLACE_WITH_SHA256" },
+        { "path": "licenses/FFmpeg/COPYING.LGPLv2.1", "sha256": "REPLACE_WITH_SHA256" },
+        { "path": "licenses/FFmpeg/corresponding-source.tar.xz", "sha256": "REPLACE_WITH_SHA256" },
+        { "path": "licenses/FFmpeg/build-configuration.txt", "sha256": "REPLACE_WITH_SHA256" }
+      ]
+    }
+  ]
+}
