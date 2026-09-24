@@ -54,7 +54,7 @@ jobs:
           $portable = ".\artifacts\installer\NITHConverter-portable-win-x64-$version.zip"
           Compress-Archive -Path .\artifacts\publish\win-x64\* -DestinationPath $portable -Force
           foreach ($file in @($installer.FullName, (Resolve-Path $portable).Path)) {
-            $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            $hash = (Get-Sha256Hex -Path $file)
             "$hash  $([IO.Path]::GetFileName($file))" | Set-Content -LiteralPath "$file.sha256" -Encoding ascii
           }
           "installer=$($installer.FullName)" >> $env:GITHUB_OUTPUT

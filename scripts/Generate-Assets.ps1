@@ -22,8 +22,8 @@ if ($candidates.Count -ne 1) {
 $source = $candidates[0].FullName
 $sizes = @(16, 20, 24, 32, 40, 48, 64, 128, 256, 512)
 $stampPath = Join-Path $OutputDirectory '.assets.sha256'
-$fingerprint = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash + ':' +
-    (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash
+$fingerprint = (Get-Sha256Hex -Path $source) + ':' +
+    (Get-Sha256Hex -Path $PSCommandPath)
 $expected = @('app.ico') + @($sizes | ForEach-Object { "logo-$_.png" })
 $missing = @($expected | Where-Object { -not (Test-Path -LiteralPath (Join-Path $OutputDirectory $_)) })
 if ($missing.Count -eq 0 -and (Test-Path -LiteralPath $stampPath) -and
