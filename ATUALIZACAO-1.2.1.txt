@@ -1,7 +1,0 @@
-Versão 1.2.1
-
-- Interface renovada com melhor aproveitamento da área útil.
-- Gradientes e visual alinhados à identidade da Nith Digital.
-- Nova logo transparente usada no aplicativo e nos assets gerados.
-- Remoção do texto técnico de C# / WinUI 3 da interface.
-- Conversão de áudio continua disponível e a versão exibida permanece dinâmica.
