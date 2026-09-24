@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.0
+- Correção da tela de abertura após a reformulação visual: os elementos animados `LogoHolder` e `Orbit` voltaram a ser nomeados no XAML para corresponder ao code-behind.
+- Mantém a nova interface Nith, logo transparente e conversão de áudio.
+
+
 ## 1.2.1
 - Interface reformulada com layout mais aproveitado em telas grandes e menos espaço vazio nas laterais.
 - Visual atualizado com gradientes em azul inspirados na identidade da Nith Digital.

@@ -2,9 +2,9 @@
   <Grid Background="{StaticResource AppBackground}">
     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20">
       <Grid Width="230" Height="230" HorizontalAlignment="Center">
-        <Ellipse Width="202" Height="202" HorizontalAlignment="Center" VerticalAlignment="Center" Stroke="#2D66BCFF" StrokeThickness="2" StrokeDashArray="2,7"/>
+        <Ellipse x:Name="Orbit" Width="202" Height="202" HorizontalAlignment="Center" VerticalAlignment="Center" Stroke="#2D66BCFF" StrokeThickness="2" StrokeDashArray="2,7"/>
         <Ellipse Width="180" Height="180" HorizontalAlignment="Center" VerticalAlignment="Center" Stroke="#1A53B6FF" StrokeThickness="1"/>
-        <Border Width="172" Height="172" HorizontalAlignment="Center" VerticalAlignment="Center" Background="#10223C55" CornerRadius="86" BorderBrush="#3266BCFF" BorderThickness="1">
+        <Border x:Name="LogoHolder" Width="172" Height="172" HorizontalAlignment="Center" VerticalAlignment="Center" Background="#10223C55" CornerRadius="86" BorderBrush="#3266BCFF" BorderThickness="1">
           <Image Source="ms-appx:///Assets/Generated/logo-256.png" Width="156" Height="156" Stretch="Uniform" AutomationProperties.Name="Logo NITH"/>
         </Border>
       </Grid>
