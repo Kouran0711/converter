@@ -78,7 +78,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Publish.ps1 -Install
 Publicar uma versão específica:
 
 ```powershell
-.\scripts\Publish.ps1 -Installer -Version 1.6.2
+.\scripts\Publish.ps1 -Installer -Version 1.7.0
 ```
 
 Saídas:
@@ -95,8 +95,8 @@ O instalador exige administrador por projeto (`PrivilegesRequired=admin`). O apl
 Depois de enviar o código para o GitHub, uma release pode ser criada apenas com uma tag:
 
 ```powershell
-git tag v1.6.2
-git push origin v1.6.2
+git tag v1.7.0
+git push origin v1.7.0
 ```
 
 O GitHub Actions compila no Windows, cria o instalador, pacote portátil e checksums SHA-256 e publica a GitHub Release automaticamente.

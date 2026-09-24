@@ -40,9 +40,9 @@ Exemplo do manifesto:
 ```json
 {
   "schema": 2,
-  "version": "1.6.2",
-  "tag": "v1.6.2",
-  "title": "NITH Converter 1.6.2",
+  "version": "1.7.0",
+  "tag": "v1.7.0",
+  "title": "NITH Converter 1.7.0",
   "installer": "NITH.Converter.exe",
   "sha256": "...",
   "size": 123456789
@@ -53,7 +53,7 @@ O número da versão vem do manifesto/tag e dos metadados do executável; ele n�
 
 ## Publicação
 
-Pelo GitHub Actions, use **Build e publicar release → Run workflow** e informe a versão, por exemplo `1.6.2`. O workflow prepara as dependências, publica o app, valida os mecanismos, gera o instalador e os checksums, cria/atualiza a release estável e confirma os assets obrigatórios.
+Pelo GitHub Actions, use **Build e publicar release → Run workflow** e informe a versão, por exemplo `1.7.0`. O workflow prepara as dependências, publica o app, valida os mecanismos, gera o instalador e os checksums, cria/atualiza a release estável e confirma os assets obrigatórios.
 
 Também é possível disparar pelo push de uma tag `vX.Y.Z`.
 

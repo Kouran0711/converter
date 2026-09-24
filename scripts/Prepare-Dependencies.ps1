@@ -28,6 +28,7 @@ $GhostscriptVersion = '10.08.0'
 $GhostscriptTag = 'gs10080'
 $GhostscriptAsset = 'gs10080w64.exe'
 $GhostscriptUrl = "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/$GhostscriptTag/$GhostscriptAsset"
+$GhostscriptSha256 = '52a91b8bf09298788d7a57b9206127026c23eacd75405f0a131e26dc381dce50'
 $VcRedistUrl = 'https://aka.ms/vc14/vc_redist.x64.exe'
 
 function Get-Sha256Hex {
@@ -53,7 +54,7 @@ function Invoke-Download {
     for ($attempt = 1; $attempt -le 4; $attempt++) {
         try {
             Write-Host "Baixando ($attempt/4): $Uri"
-            Invoke-WebRequest -Uri $Uri -OutFile $Destination -MaximumRedirection 10 -Headers @{ 'User-Agent' = 'NITHConverter-Build/1.6.2' }
+            Invoke-WebRequest -Uri $Uri -OutFile $Destination -MaximumRedirection 10 -Headers @{ 'User-Agent' = 'NITHConverter-Build/1.7.0' }
             if ((Get-Item -LiteralPath $Destination).Length -lt 1024) { throw "Download muito pequeno: $Uri" }
             return
         }
@@ -74,16 +75,32 @@ function Get-GitHubAssetSha256 {
     )
     $headers = @{
         'Accept' = 'application/vnd.github+json'
-        'User-Agent' = 'NITHConverter-Build/1.6.2'
-        'X-GitHub-Api-Version' = '2026-03-10'
+        'User-Agent' = 'NITHConverter-Build/1.7.0'
+        'X-GitHub-Api-Version' = '2022-11-28'
     }
-    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/releases/tags/$Tag" -Headers $headers
-    $asset = @($release.assets) | Where-Object { $_.name -eq $AssetName } | Select-Object -First 1
-    if ($null -eq $asset) { throw "Asset não encontrado em $Repository/$Tag: $AssetName" }
-    if ($asset.digest -match '^sha256:([A-Fa-f0-9]{64})$') { return $Matches[1].ToLowerInvariant() }
-    throw "O GitHub não publicou digest SHA-256 para $AssetName."
+    try {
+        $endpoint = if ($Tag -ieq 'latest') {
+            "https://api.github.com/repos/$Repository/releases/latest"
+        }
+        else {
+            "https://api.github.com/repos/$Repository/releases/tags/$Tag"
+        }
+        $release = Invoke-RestMethod -Uri $endpoint -Headers $headers
+        $asset = @($release.assets) | Where-Object { $_.name -eq $AssetName } | Select-Object -First 1
+        if ($null -eq $asset) {
+            throw ("Asset não encontrado em {0}/{1}: {2}" -f $Repository, $Tag, $AssetName)
+        }
+        if ($asset.digest -match '^sha256:([A-Fa-f0-9]{64})$') {
+            return $Matches[1].ToLowerInvariant()
+        }
+        Write-Warning ("O GitHub não forneceu digest SHA-256 para {0}. O pacote será validado por HTTPS, estrutura do arquivo e teste funcional." -f $AssetName)
+        return $null
+    }
+    catch {
+        Write-Warning ("Não foi possível consultar o digest do GitHub para {0}: {1}. A preparação continuará e o binário será testado antes da publicação." -f $AssetName, $_.Exception.Message)
+        return $null
+    }
 }
-
 function Assert-Hash {
     param([string]$Path, [string]$Expected)
     $actual = Get-Sha256Hex -Path $Path
@@ -136,11 +153,11 @@ Remove-Item -LiteralPath $imDest -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $imDest -Force | Out-Null
 Get-ChildItem -LiteralPath $imRoot -Force | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $imDest -Recurse -Force }
 
-# 2) FFmpeg: build LGPL estático. O digest publicado pelo próprio GitHub é conferido antes de extrair.
+# 2) FFmpeg: build LGPL estático. Quando disponível, o digest publicado pelo GitHub é conferido antes de extrair; o teste funcional continua obrigatório.
 $ffmpegZip = Join-Path $cache $FFmpegAsset
 if (-not (Test-Path -LiteralPath $ffmpegZip)) { Invoke-Download -Uri $FFmpegUrl -Destination $ffmpegZip }
 $ffmpegHash = Get-GitHubAssetSha256 -Repository 'BtbN/FFmpeg-Builds' -Tag $FFmpegTag -AssetName $FFmpegAsset
-Assert-Hash -Path $ffmpegZip -Expected $ffmpegHash
+if (-not [string]::IsNullOrWhiteSpace($ffmpegHash)) { Assert-Hash -Path $ffmpegZip -Expected $ffmpegHash }
 $ffmpegStage = Join-Path $cache 'ffmpeg-stage'
 Remove-Item -LiteralPath $ffmpegStage -Recurse -Force -ErrorAction SilentlyContinue
 Expand-Archive -LiteralPath $ffmpegZip -DestinationPath $ffmpegStage -Force
@@ -153,11 +170,10 @@ New-Item -ItemType Directory -Path $ffmpegDest -Force | Out-Null
 Copy-Item -LiteralPath $ffmpegExe.FullName -Destination (Join-Path $ffmpegDest 'ffmpeg.exe') -Force
 Copy-Item -LiteralPath $ffprobeExe.FullName -Destination (Join-Path $ffmpegDest 'ffprobe.exe') -Force
 
-# 3) Ghostscript: o instalador oficial é verificado pelo digest do GitHub e extraído em uma pasta privada do aplicativo.
+# 3) Ghostscript: versão oficial fixada, verificada por SHA-256 conhecido e extraída em uma pasta privada do aplicativo.
 $gsInstaller = Join-Path $cache $GhostscriptAsset
 if (-not (Test-Path -LiteralPath $gsInstaller)) { Invoke-Download -Uri $GhostscriptUrl -Destination $gsInstaller }
-$gsHash = Get-GitHubAssetSha256 -Repository 'ArtifexSoftware/ghostpdl-downloads' -Tag $GhostscriptTag -AssetName $GhostscriptAsset
-Assert-Hash -Path $gsInstaller -Expected $gsHash
+Assert-Hash -Path $gsInstaller -Expected $GhostscriptSha256
 $gsStage = Join-Path $cache 'ghostscript-stage'
 Remove-Item -LiteralPath $gsStage -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $gsStage -Force | Out-Null

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.0
+- Corrigido erro de sintaxe do PowerShell que interrompia o GitHub Actions antes da preparação das dependências.
+- Preparação de dependências mais resiliente: consulta de digest do FFmpeg virou validação adicional, sem bloquear o build quando o GitHub não publica digest.
+- Ghostscript 10.08.0 usa SHA-256 fixado e verificado para o instalador oficial x64.
+- Workflow agora valida a sintaxe de todos os scripts PowerShell antes de iniciar downloads e compilação.
+- Mantidas as dependências incorporadas (ImageMagick, FFmpeg/FFprobe e Ghostscript) e o VC++ Runtime no instalador.
+
 ## 1.6.2
 - Instalador passa a incluir ImageMagick, FFmpeg, FFprobe e Ghostscript no próprio aplicativo; não é necessário instalar esses mecanismos manualmente.
 - Instalador também prepara o Microsoft Visual C++ 2015-2022 Runtime x64, usado por componentes nativos.

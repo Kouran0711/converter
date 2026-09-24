@@ -17,7 +17,7 @@ O resultado fica em `artifacts/publish/win-x64/`. A publicação é self-contain
 Para uma entrega destinada ao usuário final, execute:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Publish.ps1 -Installer -Version 1.6.2
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Publish.ps1 -Installer -Version 1.7.0
 ```
 
 Quando `-Installer` é usado, o build prepara automaticamente o pacote de dependências antes de publicar. Não é necessário usar um switch extra.

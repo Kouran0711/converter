@@ -1,0 +1,8 @@
+NITH Converter 1.7.0
+
+Correções de build e dependências:
+- Corrige o parser PowerShell que impedia a publicação no GitHub Actions.
+- Valida sintaxe dos scripts antes da compilação.
+- Melhora a preparação de FFmpeg e Ghostscript para evitar falhas desnecessárias na API do GitHub.
+- Mantém ImageMagick, FFmpeg/FFprobe e Ghostscript incorporados ao aplicativo.
+- Mantém VC++ Runtime x64 instalado silenciosamente pelo instalador.

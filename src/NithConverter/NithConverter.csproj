@@ -18,7 +18,7 @@
     <SelfContained>true</SelfContained>
     <PublishSingleFile>false</PublishSingleFile>
     <PublishTrimmed>false</PublishTrimmed>
-    <Version>1.6.2</Version>
+    <Version>1.7.0</Version>
     <Company>Nith Digital</Company>
     <Product>NITH Converter</Product>
     <Description>Conversor de imagens, documentos, vídeos e áudios para Windows</Description>

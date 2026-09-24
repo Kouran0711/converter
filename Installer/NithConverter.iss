@@ -1,6 +1,6 @@
-﻿; Build with scripts/Publish.ps1 -Installer, using Inno Setup 6.3 or later.
+; Build with scripts/Publish.ps1 -Installer, using Inno Setup 6.3 or later.
 #ifndef AppVersion
-  #define AppVersion "1.6.2"
+  #define AppVersion "1.7.0"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\publish\win-x64"
