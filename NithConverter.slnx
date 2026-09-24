@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/NithConverter.Core/NithConverter.Core.csproj" />
+    <Project Path="src/NithConverter/NithConverter.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/NithConverter.IntegrationTests/NithConverter.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

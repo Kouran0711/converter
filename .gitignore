@@ -1,0 +1,23 @@
+# Build / IDE
+**/bin/
+**/obj/
+.vs/
+.idea/
+*.user
+*.suo
+.tools/
+artifacts/
+TestResults/
+
+# Generated from the original logo at build time
+src/NithConverter/Assets/Generated/
+
+# Locally staged and reviewed third-party bundles
+Installer/Dependencies/payload/
+Installer/Dependencies/bundle-manifest.json
+
+# Local diagnostics and signing material
+*.log
+*.pfx
+*.p12
+*.snk
