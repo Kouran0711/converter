@@ -33,21 +33,21 @@ Exemplo de manifesto:
 ```json
 {
   "schema": 2,
-  "version": "1.5.2",
-  "tag": "v1.5.2",
-  "title": "NITH Converter 1.5.2",
+  "version": "1.5.3",
+  "tag": "v1.5.3",
+  "title": "NITH Converter 1.5.3",
   "installer": "NITH.Converter.exe",
   "sha256": "<sha256>",
   "size": 12345678
 }
 ```
 
-## Publicar a versão 1.5.2
+## Publicar a versão 1.5.3
 
 Depois de enviar o código para `main`, abra **GitHub > Actions > Build e publicar release > Run workflow** e informe:
 
 ```text
-1.5.2
+1.5.3
 ```
 
 O workflow:
@@ -66,36 +66,36 @@ O workflow:
 Também é possível publicar por tag:
 
 ```powershell
-git tag v1.5.2
-git push origin v1.5.2
-```
-
-## Publicar a próxima atualização
-
-Exemplo para `1.5.3`:
-
-```powershell
-git add -A
-git commit -m "NITH Converter 1.5.3"
-git push origin main
-```
-
-Depois execute o workflow manual com `1.5.3`, ou crie a tag:
-
-```powershell
 git tag v1.5.3
 git push origin v1.5.3
 ```
 
-Quem estiver usando `1.5.2` deverá ver **Instalada: 1.5.2 · GitHub: 1.5.3**, baixar o instalador e receber a opção **Instalar agora**.
+## Publicar a próxima atualização
+
+Exemplo para `1.5.4`:
+
+```powershell
+git add -A
+git commit -m "NITH Converter 1.5.4"
+git push origin main
+```
+
+Depois execute o workflow manual com `1.5.4`, ou crie a tag:
+
+```powershell
+git tag v1.5.4
+git push origin v1.5.4
+```
+
+Quem estiver usando `1.5.3` deverá ver **Instalada: 1.5.3 · GitHub: 1.5.4**, baixar o instalador e receber a opção **Instalar agora**.
 
 ## Regra de versão
 
 Use versões crescentes no formato:
 
 ```text
-v1.5.2
 v1.5.3
+v1.5.4
 v1.6.0
 v2.0.0
 ```
@@ -104,13 +104,13 @@ Não reutilize a mesma tag para builds diferentes.
 
 ## Testar o atualizador
 
-1. Publique e instale `v1.5.2`.
+1. Publique e instale `v1.5.3`.
 2. Faça uma pequena mudança no código.
-3. Publique `v1.5.3`.
-4. Abra a instalação `1.5.2`.
-5. Em **Configurações > Atualizações**, confirme que a tela mostra a versão instalada e a versão encontrada no GitHub.
+3. Publique `v1.5.4`.
+4. Abra a instalação `1.5.3`.
+5. Em **Configurações > Atualizações**, confirme que a tela mostra **Instalada: 1.5.3 · GitHub: 1.5.4**.
 6. Baixe a atualização e confirme a mensagem de SHA-256 validado.
-7. Clique em **Instalar agora**, aceite o UAC e confirme que a nova versão aparece após reiniciar.
+7. Clique em **Instalar agora**, aceite o UAC e confirme que a versão `1.5.4` aparece após reiniciar.
 
 ## Se o GitHub Action falhar
 

@@ -1,6 +1,6 @@
-; Build with scripts/Publish.ps1 -Installer, using Inno Setup 6.3 or later.
+﻿; Build with scripts/Publish.ps1 -Installer, using Inno Setup 6.3 or later.
 #ifndef AppVersion
-  #define AppVersion "1.5.2"
+  #define AppVersion "1.5.3"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\publish\win-x64"
@@ -58,9 +58,11 @@ Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: 
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#BrandIcon}"; Tasks: desktopicon
 
 [Run]
-; Mantém a pasta de instalação visualmente limpa: arquivos de runtime continuam presentes,
-; porém ocultos no Explorer padrão. O executável principal permanece visível.
-Filename: "{cmd}"; Parameters: "/C attrib +h ""{app}\*"" /S /D & attrib -h ""{app}\{#AppExeName}"""; Flags: runhidden waituntilterminated
+; Corrige instalações anteriores que ocultavam a pasta inteira. Primeiro restaura a visibilidade
+; de todos os arquivos e diretórios; depois oculta SOMENTE o lixo técnico no diretório raiz.
+; Pastas, desinstalador, executável principal e arquivos de suporte importantes permanecem visíveis.
+Filename: "{cmd}"; Parameters: "/C attrib -h ""{app}\*"" /S /D >nul 2>&1 & exit /b 0"; Flags: runhidden waituntilterminated
+Filename: "{cmd}"; Parameters: "/C attrib +h ""{app}\*.dll"" >nul 2>&1 & attrib +h ""{app}\*.json"" >nul 2>&1 & attrib +h ""{app}\*.pri"" >nul 2>&1 & attrib +h ""{app}\*.pdb"" >nul 2>&1 & attrib +h ""{app}\*.xml"" >nul 2>&1 & attrib +h ""{app}\*.winmd"" >nul 2>&1 & attrib +h ""{app}\RestartAgent.exe"" >nul 2>&1 & attrib +h ""{app}\{#BrandIcon}"" >nul 2>&1 & attrib -h ""{app}\{#AppExeName}"" >nul 2>&1 & attrib -h ""{app}\unins*.exe"" >nul 2>&1 & attrib -h ""{app}\unins*.dat"" >nul 2>&1 & exit /b 0"; Flags: runhidden waituntilterminated
 Filename: "{app}\{#AppExeName}"; Description: "Abrir {#AppName}"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 ; Settings, logs, histórico e arquivos do usuário ficam fora da pasta do programa.

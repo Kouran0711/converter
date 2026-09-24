@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.3
+- Corrigida a limpeza visual da pasta de instalação: versões anteriores ocultavam tudo, inclusive pastas e desinstalador.
+- Em upgrades, o instalador restaura primeiro a visibilidade dos itens antigos que ficaram ocultos.
+- Agora somente arquivos técnicos do runtime no diretório raiz ficam ocultos, como DLL, PRI, JSON, PDB, XML e WINMD.
+- `NITHConverter.exe`, `unins*.exe`, `unins*.dat`, pastas e arquivos de suporte importantes permanecem visíveis no Explorer.
+- `RestartAgent.exe` e o arquivo de ícone versionado continuam ocultos por serem itens internos de suporte.
+- Mantidas as correções do atualizador introduzidas na 1.5.2.
+
 ## 1.5.2
 - Atualizador refeito para consultar a lista de releases estáveis e escolher a maior versão sem depender apenas do marcador “Latest”.
 - Corrigido o caso em que um manifesto antigo fazia o app dizer incorretamente que já estava atualizado.

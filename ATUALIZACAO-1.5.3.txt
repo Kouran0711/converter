@@ -1,0 +1,11 @@
+NITH Converter 1.5.3
+
+Correção da pasta de instalação:
+- restaura a visibilidade de pastas e do desinstalador em instalações atualizadas;
+- deixa visíveis o executável principal, o desinstalador e as pastas do aplicativo;
+- oculta somente arquivos técnicos de runtime no diretório raiz (DLL, JSON, PRI, PDB, XML e WINMD);
+- mantém RestartAgent.exe e o ícone versionado ocultos por serem arquivos internos.
+
+O sistema de atualização corrigido na 1.5.2 foi preservado.
+
+Para publicar: execute o workflow manual com a versão 1.5.3.

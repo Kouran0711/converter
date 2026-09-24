@@ -68,7 +68,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Publish.ps1 -Install
 Publicar uma versão específica:
 
 ```powershell
-.\scripts\Publish.ps1 -Installer -Version 1.5.2
+.\scripts\Publish.ps1 -Installer -Version 1.5.3
 ```
 
 Saídas:
@@ -85,8 +85,8 @@ O instalador exige administrador por projeto (`PrivilegesRequired=admin`). O apl
 Depois de enviar o código para o GitHub, uma release pode ser criada apenas com uma tag:
 
 ```powershell
-git tag v1.5.2
-git push origin v1.5.2
+git tag v1.5.3
+git push origin v1.5.3
 ```
 
 O GitHub Actions compila no Windows, cria o instalador, pacote portátil e checksums SHA-256 e publica a GitHub Release automaticamente.
@@ -104,6 +104,10 @@ O GitHub Actions compila no Windows, cria o instalador, pacote portátil e check
 | `docs` | documentação de distribuição, validação e atualizações |
 
 Arquivos de build (`bin`, `obj`, `artifacts`, `.tools`, assets gerados etc.) ficam fora do Git por meio do `.gitignore`.
+
+## Pasta de instalação
+
+Para evitar a lista enorme de arquivos técnicos no Explorer, o instalador oculta somente arquivos de runtime do diretório raiz, como `.dll`, `.json`, `.pri`, `.pdb`, `.xml` e `.winmd`. O executável principal, o desinstalador e as pastas continuam visíveis. Em upgrades vindos de versões antigas, o instalador também restaura a visibilidade de itens que tenham sido ocultados pela regra anterior.
 
 ## Privacidade
 
