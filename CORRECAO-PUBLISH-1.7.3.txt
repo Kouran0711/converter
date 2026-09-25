@@ -1,0 +1,8 @@
+NITH Converter 1.7.3 - correção do publish
+
+Falha corrigida:
+NETSDK1152 por ghostscript.version duplicado entre win-x86 e win-x64 do Ghostscript.NativeAssets 10.8.0.
+
+A aplicação é x64. O pacote nativo agora é referenciado diretamente pelo projeto final NithConverter e o publish remove os assets win-x86 e o marcador ghostscript.version antes da verificação de conflitos do .NET SDK.
+
+A DLL x64 do Ghostscript continua sendo publicada e o workflow continua validando gsdll64.dll e Ghostscript.NET.dll antes de criar a release.

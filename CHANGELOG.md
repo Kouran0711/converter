@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.7.3
+- Corrigido o publish x64 do Ghostscript.NativeAssets: os assets x86 e o marcador duplicado `ghostscript.version` são filtrados antes da resolução de conflitos do .NET SDK (NETSDK1152).
 - Adicionado suporte real a documentos Word, Excel, PowerPoint e OpenDocument: DOC, DOCX, XLS, XLSX, PPT, PPTX, ODT, ODS, ODP e RTF.
 - LibreOffice 26.8.0 passa a ser instalado silenciosamente pelo instalador online somente quando não estiver presente.
 - DOC/DOCX/XLS/XLSX/PPT/PPTX e formatos OpenDocument podem ser convertidos para PDF preservando o documento completo.

@@ -28,7 +28,22 @@
     <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="1.8.260803003" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools.MSIX" Version="1.7.20250829.1" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4654" />
+    <!-- Native Ghostscript assets belong to the final x64 application, not to the RID-neutral Core library. -->
+    <PackageReference Include="Ghostscript.NativeAssets" Version="10.8.0" GeneratePathProperty="true" />
     <ProjectReference Include="../NithConverter.Core/NithConverter.Core.csproj" />
   </ItemGroup>
+  <!--
+    Ghostscript.NativeAssets 10.8.0 contains a small ghostscript.version marker in both
+    win-x86 and win-x64 native folders. With a RID-neutral project reference the .NET 10
+    publish pipeline can see both markers flattened to the same destination and raises
+    NETSDK1152. The application is x64-only, so discard x86 assets and the non-runtime
+    marker before the SDK performs duplicate publish-file conflict resolution.
+  -->
+  <Target Name="FilterGhostscriptNativeAssetsForWinX64" BeforeTargets="_HandleFileConflictsForPublish">
+    <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' and '$(PkgGhostscript_NativeAssets)' != ''">
+      <ResolvedFileToPublish Remove="$(PkgGhostscript_NativeAssets)\runtimes\win-x86\native\**\*" />
+      <ResolvedFileToPublish Remove="$(PkgGhostscript_NativeAssets)\runtimes\win-x64\native\ghostscript.version" />
+    </ItemGroup>
+  </Target>
   <Import Project="../../scripts/Nith.Assets.targets" Condition="Exists('../../scripts/Nith.Assets.targets')" />
 </Project>
