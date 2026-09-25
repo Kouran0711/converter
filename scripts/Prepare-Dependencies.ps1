@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [string]$DependencyDirectory = '',
     [switch]$Force
@@ -54,7 +54,7 @@ function Invoke-Download {
     for ($attempt = 1; $attempt -le 4; $attempt++) {
         try {
             Write-Host "Baixando ($attempt/4): $Uri"
-            Invoke-WebRequest -Uri $Uri -OutFile $Destination -MaximumRedirection 10 -Headers @{ 'User-Agent' = 'NITHConverter-OfflineBundle/1.7.1' }
+            Invoke-WebRequest -Uri $Uri -OutFile $Destination -MaximumRedirection 10 -Headers @{ 'User-Agent' = 'NITHConverter-OfflineBundle/1.7.3' }
             if ((Get-Item -LiteralPath $Destination).Length -lt 1024) { throw "Download muito pequeno: $Uri" }
             return
         }
@@ -75,7 +75,7 @@ function Get-GitHubAssetSha256 {
     )
     $headers = @{
         'Accept' = 'application/vnd.github+json'
-        'User-Agent' = 'NITHConverter-OfflineBundle/1.7.1'
+        'User-Agent' = 'NITHConverter-OfflineBundle/1.7.3'
         'X-GitHub-Api-Version' = '2022-11-28'
     }
     try {

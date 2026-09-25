@@ -18,12 +18,13 @@ public sealed record ConversionResult(bool Success, bool Canceled, string? Outpu
     string UserMessage, string? TechnicalDetails, TimeSpan Duration, ConversionError Error);
 
 public sealed record DependencySnapshot(string? ImageMagickPath, string? FFmpegPath,
-    string? FFprobePath, string? GhostscriptPath)
+    string? FFprobePath, string? GhostscriptPath, string? LibreOfficePath)
 {
     public bool ImagesAvailable => ImageMagickPath is not null;
     public bool VideosAvailable => FFmpegPath is not null;
     public bool AudioAvailable => FFmpegPath is not null;
     public bool PdfReadingAvailable => ImageMagickPath is not null && GhostscriptPath is not null;
+    public bool OfficeDocumentsAvailable => LibreOfficePath is not null;
 }
 
 public sealed class AppSettings

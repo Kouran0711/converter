@@ -1,7 +1,7 @@
 ; NITH Converter - instalador online.
 ; Requer Inno Setup 6.7.2+ porque usa download + extractarchive em tempo de instalação.
 #ifndef AppVersion
-  #define AppVersion "1.7.1"
+  #define AppVersion "1.7.3"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\publish\win-x64"
@@ -13,14 +13,15 @@
 #define AppExeName "NITHConverter.exe"
 #define BrandIcon "NITH Converter " + AppVersion + ".ico"
 
-; Componentes nativos baixados NO COMPUTADOR DO USUÁRIO, durante a instalação.
-; Assim o GitHub Actions não precisa baixar centenas de MB para toda release.
+; ImageMagick e FFmpeg são baixados NO COMPUTADOR DO USUÁRIO durante a instalação.
+; Ghostscript é app-local via Ghostscript.NativeAssets/NuGet para evitar o instalador NSIS silencioso,
+; que pode bloquear em versões recentes. O GitHub Actions apenas restaura esse pacote como parte do build.
 #define ImageMagickUrl "https://download.imagemagick.org/archive/binaries/ImageMagick-7.1.2-31-portable-Q16-HDRI-x64.7z"
 #define ImageMagickHash "a6a83a77a5284a2cae5ca4a81d95e5fad21ecd56cdb647ee99f970e233504fff"
 #define FFmpegUrl "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-22-13-18/ffmpeg-n9.0.2-3-ga5923073bf-win64-lgpl-shared-9.0.zip"
-#define GhostscriptUrl "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10080/gs10080w64.exe"
-#define GhostscriptHash "52a91b8bf09298788d7a57b9206127026c23eacd75405f0a131e26dc381dce50"
 #define VCRedistUrl "https://aka.ms/vc14/vc_redist.x64.exe"
+#define LibreOfficeUrl "https://download.documentfoundation.org/libreoffice/stable/26.8.0/win/x86_64/LibreOffice_26.8.0_Win_x86-64.msi"
+#define LibreOfficeHash "4aa6c6e1895f4055104effcb556bd3362d20c6ad707c149543304f395ef9db95"
 
 [Setup]
 AppId={{5A22F590-A9F0-4B54-A732-F1E83C00A277}
@@ -63,17 +64,19 @@ Name: "desktopicon"; Description: "Criar um atalho na área de trabalho"; GroupD
 
 [Files]
 ; ImageMagick: pacote portátil privado do app. Download e extração são feitos pelo Setup.
-Source: "{#ImageMagickUrl}"; DestDir: "{app}\bin\ImageMagick"; DestName: "ImageMagick-7.1.2-31-portable-Q16-HDRI-x64.7z"; ExternalSize: 150_000_000; Hash: "{#ImageMagickHash}"; Flags: external download extractarchive ignoreversion; Check: NeedImageMagick
+Source: "{#ImageMagickUrl}"; DestDir: "{app}\bin\ImageMagick"; DestName: "ImageMagick-7.1.2-31-portable-Q16-HDRI-x64.7z"; ExternalSize: 12_000_000; Hash: "{#ImageMagickHash}"; Flags: external download extractarchive ignoreversion; Check: NeedImageMagick
 
 ; FFmpeg/FFprobe: build LGPL compartilhado, menor que o pacote estático. O ZIP possui pasta raiz própria;
 ; o aplicativo faz descoberta recursiva dentro de bin.
-Source: "{#FFmpegUrl}"; DestDir: "{app}\bin\FFmpeg"; DestName: "ffmpeg-n9.0.2-3-ga5923073bf-win64-lgpl-shared-9.0.zip"; ExternalSize: 350_000_000; Flags: external download extractarchive ignoreversion; Check: NeedFFmpeg
+Source: "{#FFmpegUrl}"; DestDir: "{app}\bin\FFmpeg"; DestName: "ffmpeg-n9.0.2-3-ga5923073bf-win64-lgpl-shared-9.0.zip"; ExternalSize: 77_000_000; Flags: external download extractarchive ignoreversion; Check: NeedFFmpeg
 
-; Pré-requisitos de sistema: são apenas baixados para a pasta temporária e executados em modo oculto.
-Source: "{#GhostscriptUrl}"; DestDir: "{tmp}"; DestName: "gs10080w64.exe"; ExternalSize: 66_000_000; Hash: "{#GhostscriptHash}"; Flags: external download ignoreversion; Check: NeedGhostscript
+; Pré-requisito de sistema baixado para a pasta temporária e executado em modo oculto.
 Source: "{#VCRedistUrl}"; DestDir: "{tmp}"; DestName: "VC_redist.x64.exe"; ExternalSize: 32_000_000; Flags: external download ignoreversion; Check: NeedVCRuntime
 
-; Aplicativo propriamente dito. Nenhum mecanismo pesado é empacotado pelo GitHub Actions.
+; LibreOffice: instalado silenciosamente apenas quando ausente. Dá suporte a DOC/DOCX/XLS/XLSX/PPT/PPTX/ODT/ODS/ODP/RTF.
+Source: "{#LibreOfficeUrl}"; DestDir: "{tmp}"; DestName: "LibreOffice_26.8.0_Win_x86-64.msi"; ExternalSize: 375_000_000; Hash: "{#LibreOfficeHash}"; Flags: external download ignoreversion; Check: NeedLibreOffice
+
+; Aplicativo propriamente dito. Ghostscript.NativeAssets vem junto do publish; ImageMagick/FFmpeg são externos.
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#PublishDir}\Assets\Brand\NithConverter.ico"; DestDir: "{app}"; DestName: "{#BrandIcon}"; Flags: ignoreversion
 
@@ -84,7 +87,9 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "
 [Run]
 ; Nenhum terminal é mostrado. Se já estiver instalado, o Check pula completamente a etapa.
 Filename: "{tmp}\VC_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Instalando Microsoft Visual C++ Runtime..."; Flags: waituntilterminated runhidden; Check: NeedVCRuntime; AfterInstall: VerifyVCRuntime
-Filename: "{tmp}\gs10080w64.exe"; Parameters: "/S"; StatusMsg: "Instalando mecanismo de documentos PDF / PS / EPS..."; Flags: waituntilterminated runhidden; Check: NeedGhostscript; AfterInstall: VerifyGhostscript
+
+; Suite Office usada somente como mecanismo headless. O usuário não precisa interagir com o MSI.
+Filename: "{sys}\msiexec.exe"; Parameters: "/i ""{tmp}\LibreOffice_26.8.0_Win_x86-64.msi"" /qn /norestart REGISTER_NO_MSO_TYPES=1 CREATEDESKTOPLINK=0 ISCHECKFORPRODUCTUPDATES=0 RebootYesNo=No"; StatusMsg: "Instalando suporte a Word, Excel e PowerPoint..."; Flags: waituntilterminated runhidden; Check: NeedLibreOffice; AfterInstall: VerifyLibreOffice
 
 ; Corrige instalações antigas que ocultavam a pasta inteira. Em seguida oculta só o lixo técnico na raiz.
 Filename: "{cmd}"; Parameters: "/C attrib -h ""{app}\*"" /S /D >nul 2>&1 & exit /b 0"; Flags: runhidden waituntilterminated
@@ -148,18 +153,32 @@ begin
             (not ContainsFileRecursive(Root, 'ffprobe.exe', 6));
 end;
 
-function NeedGhostscript: Boolean;
-var
-  PF: String;
-begin
-  if ContainsFileRecursive(ExpandConstant('{app}\bin\Ghostscript'), 'gswin64c.exe', 6) then
-  begin
-    Result := False;
-    Exit;
-  end;
 
-  PF := ExpandConstant('{autopf}\gs');
-  Result := not ContainsFileRecursive(PF, 'gswin64c.exe', 5);
+function LibreOfficeExecutable: String;
+var
+  InstallPath: String;
+begin
+  Result := ExpandConstant('{autopf}\LibreOffice\program\soffice.com');
+  if FileExists(Result) then
+    Exit;
+  Result := ExpandConstant('{autopf}\LibreOffice\program\soffice.exe');
+  if FileExists(Result) then
+    Exit;
+
+  Result := '';
+  InstallPath := '';
+  if RegQueryStringValue(HKLM64, 'SOFTWARE\LibreOffice\UNO\InstallPath', '', InstallPath) then
+  begin
+    if FileExists(AddBackslash(InstallPath) + 'soffice.com') then
+      Result := AddBackslash(InstallPath) + 'soffice.com'
+    else if FileExists(AddBackslash(InstallPath) + 'soffice.exe') then
+      Result := AddBackslash(InstallPath) + 'soffice.exe';
+  end;
+end;
+
+function NeedLibreOffice: Boolean;
+begin
+  Result := LibreOfficeExecutable = '';
 end;
 
 function NeedVCRuntime: Boolean;
@@ -178,11 +197,12 @@ begin
     RaiseException('O Microsoft Visual C++ Runtime não foi instalado corretamente. Execute o instalador novamente.');
 end;
 
-procedure VerifyGhostscript;
+procedure VerifyLibreOffice;
 begin
-  if NeedGhostscript then
-    RaiseException('O mecanismo Ghostscript não foi instalado corretamente. Execute o instalador novamente.');
+  if NeedLibreOffice then
+    RaiseException('O suporte a Word, Excel e PowerPoint não foi instalado corretamente. Execute o instalador novamente.');
 end;
+
 
 procedure InitializeWizard;
 begin
@@ -194,9 +214,11 @@ begin
     '  Imagens, formatos avançados e criação de PDF.' + #13#10#13#10 +
     'FFmpeg + FFprobe' + #13#10 +
     '  Áudio, vídeo, extração de áudio e progresso das conversões.' + #13#10#13#10 +
-    'Ghostscript' + #13#10 +
-    '  Leitura de PDF, PS e EPS.' + #13#10#13#10 +
+    'PDF / PS / EPS' + #13#10 +
+    '  Mecanismo Ghostscript integrado ao próprio aplicativo; não instala outro programa.' + #13#10#13#10 +
+    'Word / Excel / PowerPoint' + #13#10 +
+    '  LibreOffice é baixado e instalado silenciosamente quando não estiver presente (~358 MB).' + #13#10#13#10 +
     'Microsoft Visual C++ Runtime' + #13#10 +
     '  Bibliotecas nativas exigidas por componentes do aplicativo.' + #13#10#13#10 +
-    'Os downloads acontecem dentro deste instalador. Nenhuma janela de CMD ou PowerShell será aberta.');
+    'ImageMagick, FFmpeg, LibreOffice e o runtime VC++ são preparados automaticamente quando faltarem. O mecanismo PDF/PS/EPS já está dentro do NITH Converter. Nenhuma janela de CMD ou PowerShell será aberta.');
 end;

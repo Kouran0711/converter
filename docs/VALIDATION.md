@@ -5,7 +5,7 @@
 - Compilar/publishar `win-x64` em Release.
 - Confirmar que a versão gravada em `NITHConverter.exe` corresponde à versão solicitada.
 - Gerar os assets visuais sem erro.
-- Confirmar que `artifacts/publish` **não** contém ImageMagick, FFmpeg ou Ghostscript no workflow normal.
+- Confirmar que `artifacts/publish` não contém os executáveis externos de ImageMagick/FFmpeg; deve conter `gsdll64.dll` e `Ghostscript.NET.dll` do Ghostscript app-local.
 
 ## Instalador online
 
@@ -16,7 +16,7 @@ Em uma VM Windows 10/11 x64 limpa:
 3. Avance e confirme que os downloads aparecem dentro do próprio Setup, sem CMD/PowerShell.
 4. Conclua a instalação e abra Configurações.
 5. ImageMagick, FFmpeg + FFprobe e Ghostscript devem aparecer como **Instalado · pronto**.
-6. Converta pelo menos uma imagem, um áudio, um vídeo e leia um PDF/PS/EPS.
+6. Converta pelo menos uma imagem, um áudio, um vídeo, um PDF/PS/EPS e um arquivo DOCX/XLSX/PPTX para PDF.
 7. Execute o instalador de novo: componentes existentes devem ser reutilizados, sem novo download desnecessário.
 8. Confirme que executável, desinstalador e pastas importantes continuam visíveis em `Program Files`.
 

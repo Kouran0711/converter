@@ -25,8 +25,22 @@ public static class FormatCatalog
         ".avif", ".heic", ".heif", ".jp2", ".j2k", ".dds", ".pcx", ".ppm", ".pgm", ".pbm",
         ".pnm", ".pam", ".psd", ".xcf", ".svg"
     };
-    private static readonly HashSet<string> Documents = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> PageDocuments = new(StringComparer.OrdinalIgnoreCase)
         { ".pdf", ".ps", ".eps" };
+    private static readonly HashSet<string> OfficeDocuments = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".doc", ".docx", ".odt", ".rtf",
+        ".xls", ".xlsx", ".ods",
+        ".ppt", ".pptx", ".odp"
+    };
+    private static readonly HashSet<string> Documents = new(PageDocuments.Concat(OfficeDocuments), StringComparer.OrdinalIgnoreCase);
+
+    private static readonly IReadOnlyList<OutputFormat> OfficeOutputs = Array.AsReadOnly<OutputFormat>(
+    [
+        new("PDF", "PDF", ".pdf"), new("PNG", "PNG", ".png"), new("JPG", "JPG", ".jpg"),
+        new("WEBP", "WEBP", ".webp"), new("BMP", "BMP", ".bmp"), new("TIFF", "TIFF", ".tiff"),
+        new("GIF", "GIF", ".gif"), new("ICO", "ICO", ".ico"), new("TGA", "TGA", ".tga")
+    ]);
     private static readonly HashSet<string> Videos = new(StringComparer.OrdinalIgnoreCase)
     {
         ".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v", ".wmv", ".flv", ".mpeg", ".mpg",
@@ -52,19 +66,25 @@ public static class FormatCatalog
         return Documents.Contains(extension) ? MediaKind.Document : null;
     }
 
-    public static bool IsPagedDocument(string path) => Documents.Contains(Path.GetExtension(path));
+    public static bool IsPagedDocument(string path) => PageDocuments.Contains(Path.GetExtension(path));
+    public static bool IsOfficeDocument(string path) => OfficeDocuments.Contains(Path.GetExtension(path));
+    public static bool IsPageDocument(string path) => PageDocuments.Contains(Path.GetExtension(path));
     public static bool IsAudioOutput(string? id) => id is not null && AudioOutputs.Any(x => x.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
     public static bool IsVideoOutput(string? id) => id is not null && VideoOutputs.Any(x => x.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
 
-    public static IReadOnlyList<OutputFormat> GetOutputFormats(string inputPath) => GetInputKind(inputPath) switch
+    public static IReadOnlyList<OutputFormat> GetOutputFormats(string inputPath)
     {
+        if (IsOfficeDocument(inputPath)) return OfficeOutputs;
+        return GetInputKind(inputPath) switch
+        {
         MediaKind.Image or MediaKind.Document => ImageOutputs,
         // Vídeos também podem ter a faixa de áudio extraída diretamente.
         MediaKind.Video => Array.AsReadOnly(VideoOutputs.Concat(AudioOutputs).ToArray()),
         MediaKind.Audio => AudioOutputs,
         _ => Array.Empty<OutputFormat>()
-    };
+        };
+    }
 
-    public static OutputFormat? FindOutputFormat(string id) => ImageOutputs.Concat(VideoOutputs).Concat(AudioOutputs)
+    public static OutputFormat? FindOutputFormat(string id) => ImageOutputs.Concat(OfficeOutputs).Concat(VideoOutputs).Concat(AudioOutputs)
         .FirstOrDefault(format => format.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
 }

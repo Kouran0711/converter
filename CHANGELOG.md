@@ -1,16 +1,18 @@
 # Changelog
 
-## 1.7.1
-- Dependências pesadas deixaram de ser baixadas pelo GitHub Actions.
-- O instalador online baixa ImageMagick, FFmpeg/FFprobe, Ghostscript e VC++ Runtime diretamente no PC do usuário, mostrando progresso e sem abrir CMD/PowerShell.
-- Componentes já instalados são detectados e reutilizados.
-- ImageMagick e FFmpeg ficam privados na pasta do NITH Converter; Ghostscript e VC++ são instalados silenciosamente como pré-requisitos do Windows.
-- Descoberta de ImageMagick/FFmpeg agora é recursiva para aceitar a estrutura dos pacotes oficiais.
-- Releases ficaram menores: o canal de atualização publica apenas instalador, SHA-256 e nith-update.json.
-- Atualizações abrem o instalador em modo silencioso com janela de progresso, permitindo visualizar downloads/erros de dependências sem console.
-- Verificação de atualização consulta primeiro a lista de releases estáveis e escolhe a maior versão; manifesto Latest e página Latest ficam como fallbacks.
-- Downloads de dependências usam o mecanismo nativo do Inno Setup, com HTTPS, redirects, proxy do Windows e opção de tentar novamente quando uma origem falha.
-- Workflow fixa Inno Setup 6.7.3 e valida o SHA-256 do compilador para evitar bugs de extração de versões antigas.
+## 1.7.3
+- Adicionado suporte real a documentos Word, Excel, PowerPoint e OpenDocument: DOC, DOCX, XLS, XLSX, PPT, PPTX, ODT, ODS, ODP e RTF.
+- LibreOffice 26.8.0 passa a ser instalado silenciosamente pelo instalador online somente quando não estiver presente.
+- DOC/DOCX/XLS/XLSX/PPT/PPTX e formatos OpenDocument podem ser convertidos para PDF preservando o documento completo.
+- Ao converter documentos Office para imagem, o app gera PDF intermediário e usa a primeira página/planilha/slide no pipeline Ghostscript + ImageMagick.
+- LibreOffice usa perfil temporário isolado para não conflitar com uma sessão do LibreOffice aberta pelo usuário.
+
+## 1.7.2
+- Corrigido travamento do instalador na etapa PDF / PS / EPS.
+- Ghostscript deixa de ser executado como instalador silencioso externo e passa a ser integrado ao aplicativo via Ghostscript.NativeAssets.
+- PDF, PS e EPS são rasterizados em processo pelo Ghostscript.NET e depois enviados ao pipeline de conversão.
+- ImageMagick e FFmpeg continuam sendo baixados automaticamente apenas quando ausentes; o runtime VC++ permanece silencioso.
+- O GitHub Actions valida que gsdll64.dll foi realmente incluído no publish antes de criar a release.
 
 ## 1.7.0
 - Corrigido erro de sintaxe do PowerShell que interrompia o GitHub Actions antes da preparação das dependências.

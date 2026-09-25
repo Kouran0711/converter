@@ -1,6 +1,6 @@
 # Dependências — modo offline legado
 
-O instalador oficial do NITH Converter é **online**. O workflow normal de GitHub Actions **não baixa nem incorpora** ImageMagick, FFmpeg ou Ghostscript. Essas dependências são verificadas e baixadas pelo próprio instalador no computador do usuário.
+O instalador oficial do NITH Converter é **online** para ImageMagick e FFmpeg. O Ghostscript é integrado ao publish por `Ghostscript.NativeAssets` e não executa instalador externo. O Setup verifica e baixa somente ImageMagick/FFmpeg ausentes no computador do usuário.
 
 Esta pasta existe apenas para o modo de build offline opcional:
 

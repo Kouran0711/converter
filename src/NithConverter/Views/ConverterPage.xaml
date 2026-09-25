@@ -57,7 +57,7 @@
                     <Grid ColumnSpacing="10">
                       <Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                       <FontIcon Glyph="&#xE8A5;" Foreground="#3AEBA8" FontSize="19" VerticalAlignment="Center"/>
-                      <StackPanel Grid.Column="1"><TextBlock Text="Documentos" FontWeight="SemiBold"/><TextBlock Text="PDF, PS e EPS" FontSize="12" Foreground="{StaticResource MutedForeground}"/></StackPanel>
+                      <StackPanel Grid.Column="1"><TextBlock Text="Documentos" FontWeight="SemiBold"/><TextBlock Text="PDF, DOCX, XLSX, PPTX, ODT +" FontSize="12" Foreground="{StaticResource MutedForeground}"/></StackPanel>
                     </Grid>
                     <Grid ColumnSpacing="10">
                       <Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>

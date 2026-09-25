@@ -15,14 +15,15 @@ O resultado fica em `artifacts/publish/win-x64/`.
 Para gerar a entrega ao usuário final:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Publish.ps1 -Installer -Version 1.7.1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Publish.ps1 -Installer -Version 1.7.3
 ```
 
-O build **não baixa** ImageMagick, FFmpeg ou Ghostscript. O Inno Setup gera `NITH.Converter.exe` contendo apenas o aplicativo e as regras seguras de download. No PC do usuário, durante a instalação, o Setup verifica e prepara automaticamente:
+O build não baixa ImageMagick ou FFmpeg manualmente. O Ghostscript entra pelo restore NuGet oficial (`Ghostscript.NativeAssets`) e fica app-local. O Inno Setup gera `NITH.Converter.exe`; no PC do usuário, durante a instalação, o Setup verifica e prepara automaticamente ImageMagick, FFmpeg e o runtime VC++ quando necessário:
 
 - ImageMagick portátil em `bin\ImageMagick`;
 - FFmpeg + FFprobe LGPL shared em `bin\FFmpeg`;
-- Ghostscript x64 para PDF/PS/EPS;
+- Ghostscript x64 integrado para PDF/PS/EPS;
+- LibreOffice 26.8.0 para DOC/DOCX/XLS/XLSX/PPT/PPTX/ODT/ODS/ODP/RTF, baixado pelo instalador somente quando ausente;
 - Microsoft Visual C++ Redistributable x64 quando necessário.
 
 Os downloads usam HTTPS dentro do próprio Inno Setup, respeitam proxy do Windows, seguem redirects e exibem progresso. Nenhuma janela de CMD ou PowerShell é necessária para essa instalação. Componentes já presentes são reutilizados.
@@ -51,7 +52,7 @@ NITH.Converter.exe.sha256
 nith-update.json
 ```
 
-O aplicativo tenta primeiro o manifesto pequeno `nith-update.json` da release Latest. Também possui fallback pela API de Releases e pela página `/releases/latest`. O download do instalador usa `HttpClient` com timeout longo e fallbacks BITS/curl ocultos. Como o instalador não carrega as dependências pesadas, o download de atualização também fica bem menor.
+O aplicativo tenta primeiro o manifesto pequeno `nith-update.json` da release Latest. Também possui fallback pela API de Releases e pela página `/releases/latest`. O download do instalador usa `HttpClient` com timeout longo e fallbacks BITS/curl ocultos. Como ImageMagick e FFmpeg continuam sendo obtidos sob demanda e o Ghostscript é app-local, o download de atualização permanece previsível e não depende do instalador silencioso do Ghostscript.
 
 Veja `docs/UPDATES.md`.
 

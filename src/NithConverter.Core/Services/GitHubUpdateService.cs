@@ -40,9 +40,9 @@ public sealed class GitHubUpdateService
         _downloadHttp = httpClient ?? CreateDownloadHttpClient();
 
         if (!_http.DefaultRequestHeaders.UserAgent.Any())
-            _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("NITHConverter", "1.7.1"));
+            _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("NITHConverter", "1.7.3"));
         if (!_downloadHttp.DefaultRequestHeaders.UserAgent.Any())
-            _downloadHttp.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("NITHConverter-Updater", "1.7.1"));
+            _downloadHttp.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("NITHConverter-Updater", "1.7.3"));
     }
 
     private static HttpClient CreateHttpClient() => CreateHttpClientCore(TimeSpan.FromSeconds(30));
@@ -479,7 +479,7 @@ public sealed class GitHubUpdateService
             "--fail", "--location", "--silent", "--show-error",
             "--retry", "4", "--retry-delay", "2", "--retry-all-errors",
             "--connect-timeout", "20", "--max-time", "1800",
-            "--user-agent", "NITHConverter-Updater/1.7.1",
+            "--user-agent", "NITHConverter-Updater/1.7.3",
             "--output", destination, uri.AbsoluteUri
         }) startInfo.ArgumentList.Add(argument);
 

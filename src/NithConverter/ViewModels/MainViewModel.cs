@@ -37,6 +37,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private string _imageMagickStatus = "Verificando…";
     private string _ffmpegStatus = "Verificando…";
     private string _pdfStatus = "Verificando…";
+    private string _officeStatus = "Verificando…";
     private IReadOnlyList<OutputFormat> _formats = [];
     private OutputFormat? _selectedFormat;
     private bool _busy;
@@ -117,11 +118,16 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public string ImageMagickStatus { get => _imageMagickStatus; private set => Set(ref _imageMagickStatus, value); }
     public string FFmpegStatus { get => _ffmpegStatus; private set => Set(ref _ffmpegStatus, value); }
     public string PdfStatus { get => _pdfStatus; private set => Set(ref _pdfStatus, value); }
+    public string OfficeStatus { get => _officeStatus; private set => Set(ref _officeStatus, value); }
     public IReadOnlyList<OutputFormat> Formats { get => _formats; private set => Set(ref _formats, value); }
     public OutputFormat? SelectedFormat { get => _selectedFormat; set { if (Set(ref _selectedFormat, value)) { ConvertCommand.Notify(); Raise(nameof(ConversionHint)); Raise(nameof(OutputExtension)); Options.Configure(FormatCatalog.GetInputKind(_inputPath ?? ""), value?.Id); } } }
     public string ConversionHint => FormatCatalog.GetInputKind(_inputPath ?? "") switch
     {
-        MediaKind.Document => "Documento: a primeira página será convertida. PDF/PS/EPS exigem Ghostscript e permitem escolher o DPI nos ajustes.",
+        MediaKind.Document when FormatCatalog.IsOfficeDocument(_inputPath ?? "") && SelectedFormat?.Id.Equals("PDF", StringComparison.OrdinalIgnoreCase) == true
+            => "Documento Office: o arquivo completo será convertido para PDF pelo mecanismo LibreOffice instalado automaticamente.",
+        MediaKind.Document when FormatCatalog.IsOfficeDocument(_inputPath ?? "")
+            => "Documento Office: Word, Excel, PowerPoint e OpenDocument são convertidos para PDF internamente; para imagens, a primeira página/planilha/slide é usada.",
+        MediaKind.Document => "Documento: a primeira página será convertida. O mecanismo PDF/PS/EPS já vem integrado ao aplicativo e permite escolher o DPI nos ajustes.",
         MediaKind.Audio => "Áudio: converta entre MP3, WAV, FLAC, AAC, M4A, OGG, OPUS e WMA com controle de bitrate, taxa e canais.",
         MediaKind.Video when FormatCatalog.IsAudioOutput(SelectedFormat?.Id) => "Extração de áudio: o vídeo original é preservado e somente a faixa de áudio é convertida.",
         MediaKind.Video when SelectedFormat?.Id.Equals("gif", StringComparison.OrdinalIgnoreCase) == true => "GIF de vídeo: personalize FPS, largura e cores nos ajustes. O original é preservado.",
@@ -396,11 +402,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         var result = await _dependencies.DiscoverAsync(force, _lifetime.Token);
         ImageMagickStatus = result.ImageMagickPath is null ? "Não instalado" : "Instalado · pronto";
         FFmpegStatus = result.FFmpegPath is null ? "Não instalado" : result.FFprobePath is null ? "Instalação incompleta · ffprobe ausente" : "Instalado · pronto";
-        PdfStatus = result.GhostscriptPath is null ? "Não instalado" : "Instalado · pronto";
-        DependencyStatus = result.ImageMagickPath is not null && result.FFmpegPath is not null && result.FFprobePath is not null && result.GhostscriptPath is not null
+        PdfStatus = result.GhostscriptPath is null ? "Componente interno ausente" : "Integrado ao aplicativo · pronto";
+        OfficeStatus = result.LibreOfficePath is null ? "Não instalado" : "Instalado · Word / Excel / PowerPoint prontos";
+        DependencyStatus = result.ImageMagickPath is not null && result.FFmpegPath is not null && result.FFprobePath is not null && result.GhostscriptPath is not null && result.LibreOfficePath is not null
             ? "Todos os mecanismos de conversão estão instalados e prontos."
-            : "Instalação incompleta. Execute novamente o instalador do NITH Converter; ele baixará e restaurará automaticamente os componentes ausentes.";
-        await _logger.WriteAsync("dependencies", $"imagemagick={result.ImageMagickPath is not null}; ffmpeg={result.FFmpegPath is not null}; ffprobe={result.FFprobePath is not null}");
+            : "Instalação incompleta. Execute novamente o instalador do NITH Converter para restaurar os componentes ausentes.";
+        await _logger.WriteAsync("dependencies", $"imagemagick={result.ImageMagickPath is not null}; ffmpeg={result.FFmpegPath is not null}; ffprobe={result.FFprobePath is not null}; ghostscriptNative={result.GhostscriptPath is not null}; libreoffice={result.LibreOfficePath is not null}");
     }
     private async Task RefreshHistoryAsync()
     {

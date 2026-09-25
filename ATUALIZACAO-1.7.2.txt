@@ -1,0 +1,8 @@
+NITH Converter 1.7.2
+
+Correção crítica do instalador:
+- removida a execução silenciosa do instalador externo do Ghostscript, que podia ficar bloqueada indefinidamente;
+- Ghostscript passa a ser integrado ao próprio aplicativo por Ghostscript.NativeAssets;
+- PDF/PS/EPS são processados em processo pelo Ghostscript.NET;
+- o instalador continua baixando ImageMagick e FFmpeg somente se faltarem;
+- o GitHub Actions valida que a DLL nativa do Ghostscript pode ser carregada antes de publicar a release.

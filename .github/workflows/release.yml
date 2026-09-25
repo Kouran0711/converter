@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Versão da release (ex.: 1.7.1)'
+        description: 'Versão da release (ex.: 1.7.3)'
         required: true
-        default: '1.7.1'
+        default: '1.7.3'
         type: string
 
 permissions:
@@ -108,17 +108,17 @@ jobs:
           if ($failed) { throw 'Há scripts PowerShell com erro de sintaxe.' }
 
           $iss = Get-Content .\Installer\NithConverter.iss -Raw
-          foreach ($required in @('external download extractarchive', 'NeedImageMagick', 'NeedFFmpeg', 'NeedGhostscript', 'NeedVCRuntime')) {
+          foreach ($required in @('external download extractarchive', 'NeedImageMagick', 'NeedFFmpeg', 'NeedLibreOffice', 'NeedVCRuntime')) {
             if ($iss -notmatch [regex]::Escape($required)) { throw "Instalador online incompleto: faltou $required" }
           }
-          Write-Host 'Scripts e instalador online validados.'
+          Write-Host 'Scripts e instalador online validados; Ghostscript será app-local via NuGet.'
 
       - name: Publicar aplicativo e instalador pequeno
         shell: pwsh
         run: |
           .\scripts\Publish.ps1 -Installer -Version '${{ steps.version.outputs.version }}'
 
-      - name: Confirmar que dependências pesadas não foram baixadas no CI
+      - name: Validar dependências do pacote publicado
         shell: pwsh
         run: |
           $unexpected = @(
@@ -127,9 +127,22 @@ jobs:
             '.\artifacts\publish\win-x64\bin\Ghostscript\bin\gswin64c.exe'
           )
           foreach ($file in $unexpected) {
-            if (Test-Path -LiteralPath $file) { throw "O CI voltou a incorporar uma dependência pesada: $file" }
+            if (Test-Path -LiteralPath $file) { throw "O CI voltou a incorporar uma dependência externa indevida: $file" }
           }
-          Write-Host 'OK: dependências serão baixadas no PC do usuário pelo instalador.'
+          $gsNative = Get-ChildItem .\artifacts\publish\win-x64 -Recurse -File -Filter gsdll64.dll | Select-Object -First 1
+          if (-not $gsNative) { throw 'Ghostscript.NativeAssets não foi incluído no publish (gsdll64.dll ausente).' }
+          $gsManaged = Get-ChildItem .\artifacts\publish\win-x64 -Recurse -File -Filter Ghostscript.NET.dll | Select-Object -First 1
+          if (-not $gsManaged) { throw 'Ghostscript.NET.dll não foi incluído no publish.' }
+          $handle = [Runtime.InteropServices.NativeLibrary]::Load($gsNative.FullName)
+          try {
+            $entry = [Runtime.InteropServices.NativeLibrary]::GetExport($handle, 'gsapi_revision')
+            if ($entry -eq [IntPtr]::Zero) { throw 'gsapi_revision não foi exportado pela biblioteca Ghostscript.' }
+          }
+          finally {
+            [Runtime.InteropServices.NativeLibrary]::Free($handle)
+          }
+          Write-Host "Ghostscript interno carregado com sucesso: $($gsNative.FullName)"
+          Write-Host 'OK: ImageMagick/FFmpeg serão baixados no PC do usuário; Ghostscript já está integrado ao app.' 
 
       - name: Criar manifesto e checksum do atualizador
         id: assets
@@ -171,7 +184,7 @@ jobs:
             sha256 = $installerHash
             size = $installer.Length
             installer_type = 'online'
-            dependencies = @('ImageMagick', 'FFmpeg+FFprobe', 'Ghostscript', 'VC++ Runtime')
+            dependencies = @('ImageMagick', 'FFmpeg+FFprobe', 'Ghostscript NativeAssets (integrado)', 'LibreOffice 26.8.0', 'VC++ Runtime')
             release_url = "https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag"
             generated_utc = [DateTimeOffset]::UtcNow.ToString('O')
           } | ConvertTo-Json -Depth 4
@@ -231,7 +244,7 @@ jobs:
 
           for ($attempt = 1; $attempt -le 9; $attempt++) {
             try {
-              $manifest = Invoke-RestMethod -Uri $manifestUrl -MaximumRedirection 10 -Headers @{ 'User-Agent' = 'NITHConverter-ReleaseValidator/1.7.1' }
+              $manifest = Invoke-RestMethod -Uri $manifestUrl -MaximumRedirection 10 -Headers @{ 'User-Agent' = 'NITHConverter-ReleaseValidator/1.7.3' }
               if ($manifest.version -eq $version -and $manifest.tag -eq $tag) { break }
               throw "Manifesto Latest ainda aponta para $($manifest.version) / $($manifest.tag)."
             }

@@ -29,7 +29,10 @@ public sealed class DependencyService(string? applicationDirectory = null, bool 
             Path.Combine(_applicationDirectory, "bin", "ImageMagick"),
             Path.Combine(_applicationDirectory, "bin", "FFmpeg"),
             Path.Combine(_applicationDirectory, "bin", "FFmpeg", "bin"),
-            Path.Combine(_applicationDirectory, "bin", "Ghostscript", "bin"),
+            Path.Combine(_applicationDirectory, "bin", "LibreOffice"),
+            Path.Combine(_applicationDirectory, "bin", "LibreOffice", "program"),
+            Path.Combine(_applicationDirectory, "runtimes", "win-x64", "native"),
+            Path.Combine(_applicationDirectory, "native"),
             _applicationDirectory
         };
         roots.AddRange(Children(Path.Combine(_applicationDirectory, "bin")));
@@ -44,6 +47,7 @@ public sealed class DependencyService(string? applicationDirectory = null, bool 
                 {
                     roots.Add(child);
                     roots.Add(Path.Combine(child, "bin"));
+                    roots.Add(Path.Combine(child, "program"));
                 }
                 foreach (string child in Children(Path.Combine(parent, "gs")))
                     roots.Add(Path.Combine(child, "bin"));
@@ -58,8 +62,12 @@ public sealed class DependencyService(string? applicationDirectory = null, bool 
                 {
                     roots.Add(child);
                     roots.Add(Path.Combine(child, "bin"));
+                    roots.Add(Path.Combine(child, "program"));
                 }
             }
+            roots.Add(Path.Combine(programFiles, "LibreOffice", "program"));
+            roots.Add(Path.Combine(programFilesX86, "LibreOffice", "program"));
+            roots.Add(Path.Combine(local, "Programs", "LibreOffice", "program"));
             roots.Add(@"C:\ffmpeg\bin");
             roots.Add(@"C:\ProgramData\chocolatey\bin");
             roots.AddRange((Environment.GetEnvironmentVariable("PATH") ?? "")
@@ -72,8 +80,10 @@ public sealed class DependencyService(string? applicationDirectory = null, bool 
         string? magick = FindRecursive(localBin, "magick.exe", 6, token);
         string? ffmpeg = FindRecursive(localBin, "ffmpeg.exe", 6, token);
         string? ffprobe = FindRecursive(localBin, "ffprobe.exe", 6, token);
-        string? ghostscript = FindRecursive(localBin, "gswin64c.exe", 6, token)
-            ?? FindRecursive(localBin, "gswin32c.exe", 6, token);
+        string? libreOffice = FindRecursive(localBin, "soffice.com", 7, token)
+            ?? FindRecursive(localBin, "soffice.exe", 7, token);
+        string? ghostscript = FindRecursive(_applicationDirectory, "gsdll64.dll", 7, token)
+            ?? FindRecursive(_applicationDirectory, "gsdll32.dll", 7, token);
 
         foreach (string root in roots.Distinct(StringComparer.OrdinalIgnoreCase))
         {
@@ -81,11 +91,12 @@ public sealed class DependencyService(string? applicationDirectory = null, bool 
             magick ??= Find(root, "magick.exe");
             ffmpeg ??= Find(root, "ffmpeg.exe");
             ffprobe ??= Find(root, "ffprobe.exe");
-            ghostscript ??= Find(root, "gswin64c.exe") ?? Find(root, "gswin32c.exe");
+            libreOffice ??= Find(root, "soffice.com") ?? Find(root, "soffice.exe");
+            ghostscript ??= Find(root, "gsdll64.dll") ?? Find(root, "gsdll32.dll");
         }
         if (ffmpeg is not null)
             ffprobe = Find(Path.GetDirectoryName(ffmpeg)!, "ffprobe.exe") ?? ffprobe;
-        return new(magick, ffmpeg, ffprobe, ghostscript);
+        return new(magick, ffmpeg, ffprobe, ghostscript, libreOffice);
     }
 
     private static string? FindRecursive(string directory, string executable, int maxDepth, CancellationToken token)
@@ -117,7 +128,8 @@ public sealed class DependencyService(string? applicationDirectory = null, bool 
         string name = Path.GetFileName(path);
         return name.Contains("ImageMagick", StringComparison.OrdinalIgnoreCase)
             || name.Contains("FFmpeg", StringComparison.OrdinalIgnoreCase)
-            || name.Contains("Ghostscript", StringComparison.OrdinalIgnoreCase);
+            || name.Contains("Ghostscript", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("LibreOffice", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? Find(string directory, string executable)

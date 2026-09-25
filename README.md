@@ -14,6 +14,7 @@ Conversor de arquivos para Windows feito para transformar imagens, documentos, v
 - Converte imagens para PNG, JPG, WEBP, BMP, TIFF, GIF, PDF, ICO e TGA.
 - Abre diversos formatos comuns suportados pelo ImageMagick, incluindo PNG/JPG/WEBP/BMP/TIFF/GIF/ICO/TGA, AVIF/HEIC/HEIF, JP2, DDS, PCX, PNM, PSD, XCF e SVG quando os delegates necessários estão disponíveis.
 - Lê PDF, PS e EPS com Ghostscript e permite escolher o DPI da renderização.
+- Lê DOC, DOCX, XLS, XLSX, PPT, PPTX, ODT, ODS, ODP e RTF usando LibreOffice em modo headless; saída PDF preserva o documento completo e saídas de imagem usam a primeira página/planilha/slide.
 - Converte vídeos comuns como MP4, AVI, MOV, MKV, WEBM, M4V, WMV, FLV, MPEG/MPG, TS/MTS/M2TS, 3GP e OGV quando o FFmpeg instalado oferece suporte.
 - Saída de vídeo em MP4, WEBM ou GIF.
 - Ajustes de qualidade de imagem, compressão PNG, largura máxima, qualidade de vídeo, FPS, bitrate de áudio, áudio ligado/desligado e cores de GIF.
@@ -31,9 +32,13 @@ O instalador oficial é **online**: o GitHub Actions compila apenas o NITH Conve
 - ImageMagick portátil para imagens e formatos avançados.
 - FFmpeg + FFprobe (LGPL shared) para áudio e vídeo.
 - Ghostscript para PDF / PS / EPS.
+- LibreOffice para Word / Excel / PowerPoint e OpenDocument (instalado automaticamente quando necessário).
 - Microsoft Visual C++ Redistributable x64 quando necessário.
 
 Em atualizações, componentes que já existem são reutilizados. Isso mantém `NITH.Converter.exe` menor e evita downloads enormes durante todo build no GitHub.
+
+### Dependências de documentos (1.7.3)
+O mecanismo de PDF/PS/EPS não executa mais o instalador do Ghostscript em segundo plano. O projeto referencia `Ghostscript.NET` + `Ghostscript.NativeAssets`, portanto a biblioteca nativa é publicada junto com o aplicativo. ImageMagick e FFmpeg continuam sendo obtidos pelo instalador online somente quando faltarem. Para documentos Office, o instalador também baixa e instala o LibreOffice 26.8.0 silenciosamente apenas quando ele ainda não estiver presente.
 
 ## Atualizações automáticas
 
@@ -80,7 +85,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Publish.ps1 -Install
 Publicar uma versão específica:
 
 ```powershell
-.\scripts\Publish.ps1 -Installer -Version 1.7.1
+.\scripts\Publish.ps1 -Installer -Version 1.7.3
 ```
 
 Saídas:
@@ -97,11 +102,11 @@ O instalador exige administrador por projeto (`PrivilegesRequired=admin`). O apl
 Depois de enviar o código para o GitHub, uma release pode ser criada apenas com uma tag:
 
 ```powershell
-git tag v1.7.1
-git push origin v1.7.1
+git tag v1.7.3
+git push origin v1.7.3
 ```
 
-O GitHub Actions compila no Windows, cria o instalador online, gera o checksum SHA-256 e o `nith-update.json`, e publica a GitHub Release automaticamente. As dependências pesadas não são baixadas no runner.
+O GitHub Actions compila no Windows, cria o instalador online, gera o checksum SHA-256 e o `nith-update.json`, e publica a GitHub Release automaticamente. ImageMagick e FFmpeg não são baixados manualmente no runner; o Ghostscript é restaurado pelo NuGet como dependência app-local e validado antes da release.
 
 ## Estrutura
 

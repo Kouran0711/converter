@@ -23,3 +23,11 @@ Ghostscript é Copyright Artifex Software, Inc. O instalador online baixa o inst
 O workflow oficial não redistribui esses pacotes dentro do asset `NITH.Converter.exe`. Os componentes são obtidos no computador do usuário durante a instalação. Onde há digest estável publicado (ImageMagick e Ghostscript), o Setup exige o SHA-256 correspondente. O canal de atualização do NITH Converter também publica SHA-256 próprio para o instalador.
 
 Esta relação não concede uma licença para redistribuir a identidade visual ou outros materiais proprietários do NITH Converter.
+
+## Ghostscript.NET / Ghostscript.NativeAssets
+
+O NITH Converter referencia `Ghostscript.NET` e `Ghostscript.NativeAssets` para processar PDF, PS e EPS sem executar o instalador Windows do Ghostscript em segundo plano. Ghostscript/GS.NET são distribuídos pela Artifex sob AGPLv3 ou licença comercial, conforme aplicável ao distribuidor. Consulte os termos oficiais da Artifex antes de distribuir uma versão proprietária/fechada.
+
+
+## LibreOffice
+O instalador online pode baixar e instalar LibreOffice 26.8.0 x64, fornecido pela The Document Foundation, para conversão headless de documentos do Word, Excel, PowerPoint e OpenDocument. LibreOffice é software livre licenciado sob MPL 2.0 / LGPLv3+ conforme os componentes aplicáveis. O NITH Converter não modifica nem incorpora o MSI no repositório; o download é feito da infraestrutura oficial da The Document Foundation quando o componente está ausente.

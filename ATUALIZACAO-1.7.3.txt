@@ -1,0 +1,7 @@
+NITH Converter 1.7.3
+
+- Suporte a DOC, DOCX, XLS, XLSX, PPT, PPTX, ODT, ODS, ODP e RTF.
+- Conversão Office -> PDF preserva o documento completo.
+- Conversão Office -> imagem usa a primeira página/planilha/slide.
+- LibreOffice 26.8.0 é instalado silenciosamente pelo instalador apenas se estiver ausente.
+- O mecanismo Office roda em modo headless com perfil temporário isolado, sem abrir janelas.

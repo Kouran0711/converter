@@ -38,9 +38,9 @@ Exemplo do manifesto:
 ```json
 {
   "schema": 3,
-  "version": "1.7.1",
-  "tag": "v1.7.1",
-  "title": "NITH Converter 1.7.1",
+  "version": "1.7.3",
+  "tag": "v1.7.3",
+  "title": "NITH Converter 1.7.3",
   "installer": "NITH.Converter.exe",
   "sha256": "...",
   "size": 123456789,
@@ -50,11 +50,11 @@ Exemplo do manifesto:
 
 O número da versão vem do manifesto/tag e dos metadados do executável; ele não precisa fazer parte do nome do instalador.
 
-O instalador de atualização é propositalmente menor: ImageMagick, FFmpeg/FFprobe, Ghostscript e VC++ Runtime não são enviados em cada release. O próprio Setup verifica o que já existe e baixa somente o que estiver ausente no computador.
+O instalador de atualização é propositalmente enxuto: ImageMagick, FFmpeg/FFprobe e VC++ Runtime são preparados somente quando faltarem. O Ghostscript não executa um instalador separado: `Ghostscript.NativeAssets` é publicado junto com o aplicativo.
 
 ## Publicação
 
-Pelo GitHub Actions, use **Build e publicar release → Run workflow** e informe a versão, por exemplo `1.7.1`. O workflow compila o app e gera um instalador online pequeno. As dependências pesadas são baixadas pelo próprio instalador no PC do usuário; depois o workflow gera SHA-256/manifesto, publica a release estável e valida o canal público.
+Pelo GitHub Actions, use **Build e publicar release → Run workflow** e informe a versão, por exemplo `1.7.3`. O workflow compila o app e gera um instalador online. ImageMagick e FFmpeg são baixados pelo próprio instalador apenas quando faltarem; o Ghostscript já vai integrado ao aplicativo. Depois o workflow gera SHA-256/manifesto, publica a release estável e valida o canal público.
 
 Também é possível disparar pelo push de uma tag `vX.Y.Z`.
 

@@ -8,6 +8,8 @@ public sealed class ConversionService(DependencyService dependencies, HistorySer
 {
     private readonly ImageMagickService _images = new();
     private readonly FFmpegService _videos = new();
+    private readonly DocumentService _documents = new();
+    private readonly OfficeDocumentService _officeDocuments = new();
     private readonly SemaphoreSlim _singleJob = new(1, 1);
 
     public string GetOutputPath(ConversionRequest request)
@@ -60,11 +62,16 @@ public sealed class ConversionService(DependencyService dependencies, HistorySer
                 return Failure(ConversionError.OutputExists, "Esse arquivo já existe. Confirme a substituição ou escolha outro destino.");
 
             DependencySnapshot installed = await dependencies.DiscoverAsync(cancellationToken: token).ConfigureAwait(false);
+            bool officeDocument = kind == MediaKind.Document && FormatCatalog.IsOfficeDocument(input);
+            bool directOfficePdf = officeDocument && format.Id.Equals("PDF", StringComparison.OrdinalIgnoreCase);
             if ((kind is MediaKind.Video or MediaKind.Audio) && installed.FFmpegPath is null)
                 return Failure(ConversionError.DependencyMissing, "O FFmpeg interno não foi encontrado. Reinstale o NITH Converter para restaurar os componentes de conversão.");
-            if ((kind is MediaKind.Image or MediaKind.Document) && installed.ImageMagickPath is null)
+            if (officeDocument && installed.LibreOfficePath is null)
+                return Failure(ConversionError.DependencyMissing,
+                    "O mecanismo de documentos Office não foi encontrado. Reinstale o NITH Converter para instalar o LibreOffice automaticamente.");
+            if ((kind == MediaKind.Image || (kind == MediaKind.Document && !directOfficePdf)) && installed.ImageMagickPath is null)
                 return Failure(ConversionError.DependencyMissing, "O ImageMagick interno não foi encontrado. Reinstale o NITH Converter para restaurar os componentes de conversão.");
-            if (kind == MediaKind.Document && installed.GhostscriptPath is null)
+            if (kind == MediaKind.Document && !directOfficePdf && installed.GhostscriptPath is null)
                 return Failure(ConversionError.DependencyMissing,
                     "O componente interno de documentos não foi encontrado. Reinstale o NITH Converter para restaurar o Ghostscript.");
 
@@ -100,13 +107,58 @@ public sealed class ConversionService(DependencyService dependencies, HistorySer
             }
             token.ThrowIfCancellationRequested();
             await logger.WriteAsync("conversion.started", $"{kind}:{format.Id}").ConfigureAwait(false);
-            FFmpegService.Report(progress, new(null, "Convertendo…"));
+            bool directDocumentOutputReady = false;
+            if (kind == MediaKind.Document)
+            {
+                if (officeDocument)
+                {
+                    FFmpegService.Report(progress, new(null, "Convertendo documento Office para PDF…"));
+                    string officePdf = directOfficePdf ? engineOutput : Path.Combine(engineScratch, "office-document.pdf");
+                    ProcessExecutionResult officeResult = await _officeDocuments.ConvertToPdfAsync(
+                        installed.LibreOfficePath!, engineInput, officePdf, engineScratch, token).ConfigureAwait(false);
+                    if (officeResult.ExitCode != 0 || !File.Exists(officePdf) || new FileInfo(officePdf).Length == 0)
+                    {
+                        await logger.WriteAsync("office.convert_failed", officeResult.StandardError).ConfigureAwait(false);
+                        return Failure(ConversionError.Failed,
+                            "Não foi possível abrir o documento do Word, Excel ou PowerPoint. Verifique se o arquivo está íntegro ou protegido por senha.",
+                            string.Join(Environment.NewLine, new[] { officeResult.StandardOutput, officeResult.StandardError }.Where(x => !string.IsNullOrWhiteSpace(x))));
+                    }
+                    if (directOfficePdf)
+                    {
+                        directDocumentOutputReady = true;
+                    }
+                    else
+                    {
+                        engineInput = officePdf;
+                    }
+                }
+
+                if (!directDocumentOutputReady)
+                {
+                    FFmpegService.Report(progress, new(null, "Preparando a primeira página do documento…"));
+                    string renderedPage = Path.Combine(engineScratch, "document-page-1.png");
+                    ProcessExecutionResult documentRender = await _documents.RasterizeFirstPageAsync(
+                        engineInput, renderedPage, options.DocumentDpi, token).ConfigureAwait(false);
+                    if (documentRender.ExitCode != 0 || !File.Exists(renderedPage) || new FileInfo(renderedPage).Length == 0)
+                    {
+                        await logger.WriteAsync("document.render_failed", documentRender.StandardError).ConfigureAwait(false);
+                        return Failure(ConversionError.Failed,
+                            "Não foi possível renderizar o documento. Verifique se ele está íntegro e não está protegido por senha.",
+                            documentRender.StandardError);
+                    }
+                    engineInput = renderedPage;
+                }
+            }
+
+            FFmpegService.Report(progress, new(null, directDocumentOutputReady ? "Finalizando PDF…" : "Convertendo…"));
             bool useFfmpeg = kind is MediaKind.Video or MediaKind.Audio;
-            ProcessExecutionResult execution = useFfmpeg
-                ? await _videos.ConvertAsync(installed.FFmpegPath!, installed.FFprobePath, engineInput,
-                    engineOutput, format.Id, progress, token, options).ConfigureAwait(false)
-                : await _images.ConvertAsync(installed.ImageMagickPath!, engineInput, engineOutput,
-                    format.Id, engineScratch, installed.GhostscriptPath, token, options).ConfigureAwait(false);
+            ProcessExecutionResult execution = directDocumentOutputReady
+                ? new ProcessExecutionResult(0, string.Empty, string.Empty)
+                : useFfmpeg
+                    ? await _videos.ConvertAsync(installed.FFmpegPath!, installed.FFprobePath, engineInput,
+                        engineOutput, format.Id, progress, token, options).ConfigureAwait(false)
+                    : await _images.ConvertAsync(installed.ImageMagickPath!, engineInput, engineOutput,
+                        format.Id, engineScratch, null, token, options).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             if (execution.ExitCode != 0 || !File.Exists(engineOutput) || new FileInfo(engineOutput).Length == 0)
             {
